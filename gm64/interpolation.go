@@ -3,7 +3,7 @@ package gm64
 import (
 	"math"
 
-	"github.com/infastin/gul/pkg/matrix"
+	"github.com/infastin/gul/matrix"
 )
 
 func InterpolateBilinear(v00, v01, v10, v11, fx, fy float64) float64 {

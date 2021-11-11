@@ -1,7 +1,7 @@
 package gft
 
 import (
-	"github.com/infastin/gul/pkg/gm32"
+	"github.com/infastin/gul/gm32"
 )
 
 const (

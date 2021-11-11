@@ -4,7 +4,7 @@ import (
 	"image"
 	"image/draw"
 
-	"github.com/infastin/gul/pkg/gm32"
+	"github.com/infastin/gul/gm32"
 )
 
 type Position struct {

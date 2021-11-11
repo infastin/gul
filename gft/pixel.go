@@ -5,8 +5,8 @@ import (
 	"image/color"
 	"image/draw"
 
-	"github.com/infastin/gul/pkg/gm32"
-	"github.com/infastin/gul/pkg/matrix"
+	"github.com/infastin/gul/gm32"
+	"github.com/infastin/gul/matrix"
 )
 
 type pixel struct {

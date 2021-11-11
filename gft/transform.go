@@ -4,7 +4,7 @@ import (
 	"image"
 	"image/draw"
 
-	"github.com/infastin/gul/pkg/tools"
+	"github.com/infastin/gul/tools"
 )
 
 type transformFilter struct {

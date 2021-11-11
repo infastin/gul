@@ -1,7 +1,7 @@
 package gm32
 
 import (
-	"github.com/infastin/gul/pkg/gm64"
+	"github.com/infastin/gul/gm64"
 	"math"
 )
 

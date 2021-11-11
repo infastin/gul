@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"github.com/infastin/gul/pkg/gmu"
+	"github.com/infastin/gul/gmu"
 	"runtime"
 	"sync"
 )

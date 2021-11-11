@@ -1,6 +1,6 @@
 package gft
 
-import "github.com/infastin/gul/pkg/gm32"
+import "github.com/infastin/gul/gm32"
 
 type ResamplingFilter interface {
 	Kernel(x float32) float32

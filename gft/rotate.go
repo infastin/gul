@@ -5,8 +5,8 @@ import (
 	"image/draw"
 	"math"
 
-	"github.com/infastin/gul/pkg/gm32"
-	"github.com/infastin/gul/pkg/tools"
+	"github.com/infastin/gul/gm32"
+	"github.com/infastin/gul/tools"
 )
 
 type Interpolation int

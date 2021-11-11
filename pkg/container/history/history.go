@@ -2,21 +2,21 @@ package history
 
 type History struct {
 	index  int
-	defv   interface{}
 	values []interface{}
+	Defv   interface{}
 }
 
 func Make(defv interface{}) History {
 	return History{
 		index: -1,
-		defv:  defv,
+		Defv:  defv,
 	}
 }
 
 func New(defv interface{}) *History {
 	return &History{
 		index: -1,
-		defv:  defv,
+		Defv:  defv,
 	}
 }
 
@@ -33,7 +33,7 @@ func (h *History) Set(val interface{}) {
 
 func (h *History) Back() interface{} {
 	if h.index == -1 {
-		return h.defv
+		return h.Defv
 	}
 
 	h.index--
@@ -42,7 +42,7 @@ func (h *History) Back() interface{} {
 
 func (h *History) Forward() interface{} {
 	if h.index >= len(h.values)-1 {
-		return h.defv
+		return h.Defv
 	}
 
 	h.index++
@@ -51,7 +51,7 @@ func (h *History) Forward() interface{} {
 
 func (h *History) Get() interface{} {
 	if h.index == -1 {
-		return h.defv
+		return h.Defv
 	}
 
 	return h.values[h.index]
@@ -63,14 +63,6 @@ func (h *History) Len() int {
 
 func (h *History) Index() int {
 	return h.index
-}
-
-func (h *History) SetDefault(defv interface{}) {
-	h.defv = defv
-}
-
-func (h *History) Default() interface{} {
-	return h.defv
 }
 
 func (h *History) Reset() {

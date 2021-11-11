@@ -2,17 +2,6 @@ package gm32
 
 import "github.com/infastin/gul/pkg/matrix"
 
-/*
-* bilinear interpolation
-*            fx
-*    v00------------v01
-*    |        |      |
-* fy |--------v      |
-*    |               |
-*    |               |
-*    |               |
-*    v10------------v11
-**/
 func InterpolateBilinear(v00, v01, v10, v11, fx, fy float32) float32 {
 	tmp := (1-fy)*((1-fx)*v00+fx*v01) +
 		fy*((1-fx)*v10+fx*v11)

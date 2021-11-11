@@ -32,7 +32,8 @@ func (h *History) Set(val interface{}) {
 }
 
 func (h *History) Back() interface{} {
-	if h.index == -1 {
+	if h.index == 0 {
+		h.index--
 		return h.Defv
 	}
 
@@ -66,11 +67,11 @@ func (h *History) Index() int {
 }
 
 func (h *History) Reset() {
-	h.index = 0
+	h.index = -1
 }
 
 func (h *History) Clear() {
-	h.index = 0
+	h.index = -1
 	h.values = h.values[:0]
 }
 

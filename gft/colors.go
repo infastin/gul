@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/draw"
 
+	"github.com/infastin/gul/giu/gcu"
 	"github.com/infastin/gul/gm32"
 	"github.com/infastin/gul/tools"
 )
@@ -287,9 +288,9 @@ func Brightness(ratio float32) Filter {
 		colorFilter: colorFilter{
 			fn: func(pix pixel, data interface{}) pixel {
 				rat := data.(float32)
-				h, s, l := RGBToHSL(pix.r, pix.g, pix.b)
-				l = gm32.Clamp(l+rat, 0, 1)
-				r, g, b := HSLToRGB(h, s, l)
+				h, s, v := gcu.RGBToHSV(pix.r, pix.g, pix.b)
+				v = gm32.Clamp(v+rat, 0, 1)
+				r, g, b := gcu.HSVToRGB(h, s, v)
 				return pixel{r, g, b, pix.a}
 			},
 			data: ratio,
@@ -352,9 +353,9 @@ func Saturation(ratio float32) Filter {
 		colorFilter: colorFilter{
 			fn: func(pix pixel, data interface{}) pixel {
 				rat := data.(float32)
-				h, s, l := RGBToHSL(pix.r, pix.g, pix.b)
+				h, s, v := gcu.RGBToHSV(pix.r, pix.g, pix.b)
 				s = gm32.Clamp(s+rat, 0, 1)
-				r, g, b := HSLToRGB(h, s, l)
+				r, g, b := gcu.HSVToRGB(h, s, v)
 				return pixel{r, g, b, pix.a}
 			},
 			data: ratio,
@@ -417,9 +418,9 @@ func Hue(ratio float32) Filter {
 		colorFilter: colorFilter{
 			fn: func(pix pixel, data interface{}) pixel {
 				rat := data.(float32)
-				h, s, l := RGBToHSL(pix.r, pix.g, pix.b)
+				h, s, v := gcu.RGBToHSV(pix.r, pix.g, pix.b)
 				h = gm32.Clamp(h+rat, 0, 1)
-				r, g, b := HSLToRGB(h, s, l)
+				r, g, b := gcu.HSVToRGB(h, s, v)
 				return pixel{r, g, b, pix.a}
 			},
 			data: ratio,
@@ -492,13 +493,13 @@ func HSB(h, s, b float32) Filter {
 		colorFilter: colorFilter{
 			fn: func(pix pixel, data interface{}) pixel {
 				hsb := data.(hsbDiff)
-				h1, s1, l1 := RGBToHSL(pix.r, pix.g, pix.b)
+				h1, s1, v1 := gcu.RGBToHSV(pix.r, pix.g, pix.b)
 
 				h2 := gm32.Clamp(h1+hsb.h, 0, 1)
 				s2 := gm32.Clamp(s1+hsb.s, 0, 1)
-				l2 := gm32.Clamp(l1+hsb.b, 0, 1)
+				v2 := gm32.Clamp(v1+hsb.b, 0, 1)
 
-				r, g, b := HSLToRGB(h2, s2, l2)
+				r, g, b := gcu.HSVToRGB(h2, s2, v2)
 				return pixel{r, g, b, pix.a}
 			},
 			data: hsb,

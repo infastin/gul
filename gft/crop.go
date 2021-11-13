@@ -7,14 +7,6 @@ import (
 	"github.com/infastin/gul/gm32"
 )
 
-type Position struct {
-	X, Y float32
-}
-
-type Size struct {
-	Width, Height float32
-}
-
 type cropFilter struct {
 	pos  Position
 	size Size
@@ -43,11 +35,27 @@ func (f *cropFilter) Apply(dst draw.Image, src image.Image, parallel bool) {
 	draw.Draw(dst, dstb, src, image.Pt(startX, startY), draw.Over)
 }
 
-func (f *cropFilter) Merge(Filter) bool {
-	return false
+func (f *cropFilter) Merge(filter Filter) bool {
+	filt := filter.(*cropFilter)
+
+	f.pos.X += filt.pos.X * f.size.Width
+	f.pos.Y += filt.pos.Y * f.size.Height
+
+	f.size.Width *= filt.size.Width
+	f.size.Height *= filt.size.Height
+
+	return true
 }
 
-func (f *cropFilter) Undo(Filter) bool {
+func (f *cropFilter) Undo(filter Filter) bool {
+	filt := filter.(*cropFilter)
+
+	f.size.Height /= filt.size.Height
+	f.size.Width /= filt.size.Width
+
+	f.pos.X -= filt.pos.X * f.size.Width
+	f.pos.Y -= filt.pos.Y * f.size.Height
+
 	return false
 }
 

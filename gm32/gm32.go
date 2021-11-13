@@ -33,6 +33,11 @@ func Pow(x, y float32) float32 {
 	return float32(pog)
 }
 
+func Pow10(n int) float32 {
+	p := math.Pow10(n)
+	return float32(p)
+}
+
 func Min(x, y float32) float32 {
 	if x < y {
 		return x
@@ -50,6 +55,10 @@ func Max(x, y float32) float32 {
 func Round(x float32) float32 {
 	r := math.Round(float64(x))
 	return float32(r)
+}
+
+func RoundN(x float32, n int) float32 {
+	return Round(x*Pow10(n)) / Pow10(n)
 }
 
 func Floor(x float32) float32 {

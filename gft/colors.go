@@ -10,9 +10,10 @@ import (
 )
 
 type colorchanFilter struct {
-	fn   func(float32, interface{}) float32
-	lut  []float32
-	data interface{}
+	fn     func(float32, interface{}) float32
+	lut    []float32
+	useLut bool
+	data   interface{}
 }
 
 func (f *colorchanFilter) Bounds(src image.Rectangle) image.Rectangle {
@@ -26,18 +27,26 @@ func (f *colorchanFilter) Apply(dst draw.Image, src image.Image, parallel bool) 
 	pixGetter := newPixelGetter(src)
 	pixSetter := newPixelSetter(dst)
 
-	lutSize := len(f.lut)
-	neededLutSize := 0
+	useLut := false
+	if f.useLut {
+		lutSize := len(f.lut)
+		neededLutSize := 0
 
-	switch pixGetter.img.(type) {
-	case *image.RGBA, *image.NRGBA, *image.YCbCr, *image.Gray, *image.CMYK:
-		neededLutSize = 0xff + 1
-	default:
-		neededLutSize = 0xffff + 1
-	}
+		switch pixGetter.img.(type) {
+		case *image.RGBA, *image.NRGBA, *image.YCbCr, *image.Gray, *image.CMYK:
+			neededLutSize = 0xff + 1
+		default:
+			neededLutSize = 0xffff + 1
+		}
 
-	if lutSize != neededLutSize {
-		f.makeLut(neededLutSize)
+		numCalc := srcb.Dx() * srcb.Dy() * 3
+		if numCalc > neededLutSize*2 {
+			if lutSize != neededLutSize {
+				f.makeLut(neededLutSize)
+			}
+
+			useLut = true
+		}
 	}
 
 	procs := 1
@@ -49,9 +58,17 @@ func (f *colorchanFilter) Apply(dst draw.Image, src image.Image, parallel bool) 
 		for y := start; y < end; y++ {
 			for x := srcb.Min.X; x < srcb.Max.X; x++ {
 				pix := pixGetter.getPixel(x, y)
-				pix.r = f.getFromLut(pix.r)
-				pix.g = f.getFromLut(pix.g)
-				pix.b = f.getFromLut(pix.b)
+
+				if useLut {
+					pix.r = f.getFromLut(pix.r)
+					pix.g = f.getFromLut(pix.g)
+					pix.b = f.getFromLut(pix.b)
+				} else {
+					pix.r = f.fn(pix.r, f.data)
+					pix.g = f.fn(pix.g, f.data)
+					pix.b = f.fn(pix.b, f.data)
+				}
+
 				pixSetter.setPixel(dstb.Min.X+x-srcb.Min.X, dstb.Min.Y+y-srcb.Min.Y, pix)
 			}
 		}
@@ -111,10 +128,6 @@ type invertFilter struct {
 	state      byte
 }
 
-func (f *invertFilter) Skip() bool {
-	return f.state == 0
-}
-
 func (f *invertFilter) Merge(filter Filter) bool {
 	filt := filter.(*invertFilter)
 	f.state ^= filt.state
@@ -127,6 +140,10 @@ func (f *invertFilter) Undo(filter Filter) bool {
 	f.state = f.state ^ filt.state
 	f.mergeCount--
 	return f.mergeCount == 0
+}
+
+func (f *invertFilter) Skip() bool {
+	return f.state == 0
 }
 
 func (f *invertFilter) Copy() Filter {
@@ -143,8 +160,136 @@ func Invert() Filter {
 			fn: func(f float32, _ interface{}) float32 {
 				return 1 - f
 			},
+			useLut: false,
 		},
 		state:      1,
+		mergeCount: 1,
+	}
+}
+
+type contrastFilter struct {
+	colorchanFilter
+	mergeCount uint
+}
+
+func (f *contrastFilter) Merge(filter Filter) bool {
+	filt := filter.(*contrastFilter)
+
+	r1 := f.data.(float32)
+	r2 := filt.data.(float32)
+	r := gm32.Clamp(r1+r2, -1, 1)
+
+	f.data = r
+	f.mergeCount++
+
+	return true
+}
+
+func (f *contrastFilter) Undo(filter Filter) bool {
+	filt := filter.(*contrastFilter)
+
+	r1 := f.data.(float32)
+	r2 := filt.data.(float32)
+	r := gm32.Clamp(r1-r2, -1, 1)
+
+	f.data = r
+	f.mergeCount--
+
+	return f.mergeCount == 0
+}
+
+func (f *contrastFilter) Skip() bool {
+	r := f.data.(float32)
+	return r == 0
+}
+
+func (f *contrastFilter) Copy() Filter {
+	return &contrastFilter{
+		colorchanFilter: f.colorchanFilter,
+		mergeCount:      f.mergeCount,
+	}
+}
+
+func Contrast(ratio float32) Filter {
+	if ratio == 0 {
+		return nil
+	}
+
+	return &contrastFilter{
+		colorchanFilter: colorchanFilter{
+			fn: func(f float32, data interface{}) float32 {
+				rat := data.(float32)
+				rat = gm32.Clamp(rat, -1, 1)
+				alpha := rat + 1
+
+				return gm32.Clamp(alpha*f, 0, 1)
+			},
+			useLut: false,
+			data:   ratio,
+		},
+		mergeCount: 1,
+	}
+}
+
+type brightnessFilter struct {
+	colorchanFilter
+	mergeCount uint
+}
+
+func (f *brightnessFilter) Merge(filter Filter) bool {
+	filt := filter.(*brightnessFilter)
+
+	r1 := f.data.(float32)
+	r2 := filt.data.(float32)
+	r := gm32.Clamp(r1+r2, -1, 1)
+
+	f.data = r
+	f.mergeCount++
+
+	return true
+}
+
+func (f *brightnessFilter) Undo(filter Filter) bool {
+	filt := filter.(*brightnessFilter)
+
+	r1 := f.data.(float32)
+	r2 := filt.data.(float32)
+	r := gm32.Clamp(r1-r2, -1, 1)
+
+	f.data = r
+	f.mergeCount--
+
+	return f.mergeCount == 0
+}
+
+func (f *brightnessFilter) Skip() bool {
+	r := f.data.(float32)
+	return r == 0
+}
+
+func (f *brightnessFilter) Copy() Filter {
+	return &brightnessFilter{
+		colorchanFilter: f.colorchanFilter,
+		mergeCount:      f.mergeCount,
+	}
+}
+
+func Brightness(ratio float32) Filter {
+	if ratio == 0 {
+		return nil
+	}
+
+	return &brightnessFilter{
+		colorchanFilter: colorchanFilter{
+			fn: func(f float32, data interface{}) float32 {
+				rat := data.(float32)
+				beta := gm32.Clamp(rat, -1, 1)
+
+				return gm32.Clamp(f+beta, 0, 1)
+			},
+			useLut: false,
+			data:   ratio,
+		},
 		mergeCount: 1,
 	}
 }
@@ -234,193 +379,76 @@ func Grayscale() Filter {
 	}
 }
 
-type brightnessFilter struct {
+type sepiaFilter struct {
 	colorFilter
 	mergeCount uint
 }
 
-func (f *brightnessFilter) Merge(filter Filter) bool {
-	filt := filter.(*brightnessFilter)
+func (f *sepiaFilter) Merge(filter Filter) bool {
+	filt := filter.(*sepiaFilter)
 
 	r1 := f.data.(float32)
 	r2 := filt.data.(float32)
+	r := gm32.Clamp(r1+r2, 0, 1)
 
-	r := gm32.Clamp(r1+r2, -1, 1)
 	f.data = r
-
 	f.mergeCount++
 
 	return true
 }
 
-func (f *brightnessFilter) Undo(filter Filter) bool {
-	filt := filter.(*brightnessFilter)
+func (f *sepiaFilter) Undo(filter Filter) bool {
+	filt := filter.(*sepiaFilter)
 
 	r1 := f.data.(float32)
 	r2 := filt.data.(float32)
+	r := gm32.Clamp(r1-r2, 0, 1)
 
-	r := gm32.Clamp(r1-r2, -1, 1)
 	f.data = r
-
 	f.mergeCount--
 
 	return f.mergeCount == 0
 }
 
-func (f *brightnessFilter) Skip() bool {
+func (f *sepiaFilter) Skip() bool {
 	r := f.data.(float32)
 	return r == 0
 }
 
-func (f *brightnessFilter) Copy() Filter {
-	return &brightnessFilter{
+func (f *sepiaFilter) Copy() Filter {
+	return &sepiaFilter{
 		colorFilter: f.colorFilter,
 		mergeCount:  f.mergeCount,
 	}
 }
 
-func Brightness(ratio float32) Filter {
+func Sepia(ratio float32) Filter {
 	if ratio == 0 {
 		return nil
 	}
 
-	return &brightnessFilter{
+	return &sepiaFilter{
 		colorFilter: colorFilter{
 			fn: func(pix pixel, data interface{}) pixel {
 				rat := data.(float32)
-				h, s, v := gcu.RGBToHSV(pix.r, pix.g, pix.b)
-				v = gm32.Clamp(v+rat, 0, 1)
-				r, g, b := gcu.HSVToRGB(h, s, v)
-				return pixel{r, g, b, pix.a}
-			},
-			data: ratio,
-		},
-		mergeCount: 1,
-	}
-}
+				rat = gm32.Clamp(rat, 0, 1)
 
-type saturationFilter struct {
-	colorFilter
-	mergeCount uint
-}
+				rr := 1 - 0.607*rat
+				rg := 0.769 * rat
+				rb := 0.189 * rat
 
-func (f *saturationFilter) Merge(filter Filter) bool {
-	filt := filter.(*saturationFilter)
+				gr := 0.349 * rat
+				gg := 1 - 0.314*rat
+				gb := 0.168 * rat
 
-	r1 := f.data.(float32)
-	r2 := filt.data.(float32)
+				br := 0.272 * rat
+				bg := 0.534 * rat
+				bb := 1 - 0.869*rat
 
-	r := gm32.Clamp(r1+r2, -1, 1)
-	f.data = r
+				r := pix.r*rr + pix.g*rg + pix.b*rb
+				g := pix.r*gr + pix.g*gg + pix.b*gb
+				b := pix.r*br + pix.g*bg + pix.b*bb
 
-	f.mergeCount++
-
-	return true
-}
-
-func (f *saturationFilter) Undo(filter Filter) bool {
-	filt := filter.(*saturationFilter)
-
-	r1 := f.data.(float32)
-	r2 := filt.data.(float32)
-
-	r := gm32.Clamp(r1-r2, -1, 1)
-	f.data = r
-
-	f.mergeCount--
-
-	return f.mergeCount == 0
-}
-
-func (f *saturationFilter) Skip() bool {
-	r := f.data.(float32)
-	return r == 0
-}
-
-func (f *saturationFilter) Copy() Filter {
-	return &saturationFilter{
-		colorFilter: f.colorFilter,
-		mergeCount:  f.mergeCount,
-	}
-}
-
-func Saturation(ratio float32) Filter {
-	if ratio == 0 {
-		return nil
-	}
-
-	return &saturationFilter{
-		colorFilter: colorFilter{
-			fn: func(pix pixel, data interface{}) pixel {
-				rat := data.(float32)
-				h, s, v := gcu.RGBToHSV(pix.r, pix.g, pix.b)
-				s = gm32.Clamp(s+rat, 0, 1)
-				r, g, b := gcu.HSVToRGB(h, s, v)
-				return pixel{r, g, b, pix.a}
-			},
-			data: ratio,
-		},
-		mergeCount: 1,
-	}
-}
-
-type hueFilter struct {
-	colorFilter
-	mergeCount uint
-}
-
-func (f *hueFilter) Merge(filter Filter) bool {
-	filt := filter.(*hueFilter)
-
-	r1 := f.data.(float32)
-	r2 := filt.data.(float32)
-
-	r := gm32.Clamp(r1+r2, -1, 1)
-	f.data = r
-
-	f.mergeCount++
-
-	return true
-}
-
-func (f *hueFilter) Undo(filter Filter) bool {
-	filt := filter.(*hueFilter)
-
-	r1 := f.data.(float32)
-	r2 := filt.data.(float32)
-
-	r := gm32.Clamp(r1-r2, -1, 1)
-	f.data = r
-
-	f.mergeCount--
-
-	return f.mergeCount == 0
-}
-
-func (f *hueFilter) Skip() bool {
-	r := f.data.(float32)
-	return r == 0
-}
-
-func (f *hueFilter) Copy() Filter {
-	return &hueFilter{
-		colorFilter: f.colorFilter,
-		mergeCount:  f.mergeCount,
-	}
-}
-
-func Hue(ratio float32) Filter {
-	if ratio == 0 {
-		return nil
-	}
-
-	return &hueFilter{
-		colorFilter: colorFilter{
-			fn: func(pix pixel, data interface{}) pixel {
-				rat := data.(float32)
-				h, s, v := gcu.RGBToHSV(pix.r, pix.g, pix.b)
-				h = gm32.Clamp(h+rat, 0, 1)
-				r, g, b := gcu.HSVToRGB(h, s, v)
 				return pixel{r, g, b, pix.a}
 			},
 			data: ratio,
@@ -503,6 +531,85 @@ func HSB(h, s, b float32) Filter {
 				return pixel{r, g, b, pix.a}
 			},
 			data: hsb,
+		},
+		mergeCount: 1,
+	}
+}
+
+type hslDiff struct {
+	h, s, l float32
+}
+
+type hslFilter struct {
+	colorFilter
+	mergeCount uint
+}
+
+func (f *hslFilter) Merge(filter Filter) bool {
+	filt := filter.(*hslFilter)
+
+	hsl1 := f.data.(hslDiff)
+	hsl2 := filt.data.(hslDiff)
+
+	h := gm32.Clamp(hsl1.h+hsl2.h, -1, 1)
+	s := gm32.Clamp(hsl1.s+hsl2.s, -1, 1)
+	l := gm32.Clamp(hsl1.l+hsl2.l, -1, 1)
+
+	f.data = hslDiff{h, s, l}
+	f.mergeCount++
+
+	return true
+}
+
+func (f *hslFilter) Undo(filter Filter) bool {
+	filt := filter.(*hslFilter)
+
+	hsl1 := f.data.(hslDiff)
+	hsl2 := filt.data.(hslDiff)
+
+	h := gm32.Clamp(hsl1.h-hsl2.h, -1, 1)
+	s := gm32.Clamp(hsl1.s-hsl2.s, -1, 1)
+	l := gm32.Clamp(hsl1.l-hsl2.l, -1, 1)
+
+	f.data = hslDiff{h, s, l}
+	f.mergeCount--
+
+	return f.mergeCount == 0
+}
+
+func (f *hslFilter) Skip() bool {
+	hsl := f.data.(hslDiff)
+	return hsl.h == 0 && hsl.s == 0 && hsl.l == 0
+}
+
+func (f *hslFilter) Copy() Filter {
+	return &hslFilter{
+		colorFilter: f.colorFilter,
+		mergeCount:  f.mergeCount,
+	}
+}
+
+func HSL(h, s, l float32) Filter {
+	if h == 0 && s == 0 && l == 0 {
+		return nil
+	}
+
+	hsl := hslDiff{h, s, l}
+
+	return &hslFilter{
+		colorFilter: colorFilter{
+			fn: func(pix pixel, data interface{}) pixel {
+				hsl := data.(hslDiff)
+				h1, s1, l1 := gcu.RGBToHSL(pix.r, pix.g, pix.b)
+
+				h2 := gm32.Clamp(h1+hsl.h, 0, 1)
+				s2 := gm32.Clamp(s1+hsl.s, 0, 1)
+				l2 := gm32.Clamp(l1+hsl.l, 0, 1)
+
+				r, g, b := gcu.HSLToRGB(h2, s2, l2)
+				return pixel{r, g, b, pix.a}
+			},
+			data: hsl,
 		},
 		mergeCount: 1,
 	}

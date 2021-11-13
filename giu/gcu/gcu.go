@@ -127,33 +127,27 @@ func RGBToHSV(r, g, b float32) (h, s, v float32) {
 }
 
 func HSVToRGB(h, s, v float32) (r, g, b float32) {
-	ht := h * 6
-	c := s * v
-	x := c * (1 - gm32.Abs(gm32.Mod(ht, 2)-1))
-	m := v - c
+	hi := int(gm32.Mod(gm32.Floor(h*6), 6))
 
-	var r1, g1, b1 float32
+	vmin := (1 - s) * v
+	a := (v - vmin) * gm32.Mod(h, 1)
+	vinc := vmin + a
+	vdec := v - a
 
-	switch {
-	case ht < 0:
-		r1, g1, b1 = 0, 0, 0
-	case ht < 1:
-		r1, g1, b1 = c, x, 0
-	case ht < 2:
-		r1, g1, b1 = x, c, 0
-	case ht < 3:
-		r1, g1, b1 = 0, c, x
-	case ht < 4:
-		r1, g1, b1 = 0, x, c
-	case ht < 5:
-		r1, g1, b1 = x, 0, c
-	case ht < 6:
-		r1, g1, b1 = c, 0, x
+	switch hi {
+	case 0:
+		r, g, b = v, vinc, vmin
+	case 1:
+		r, g, b = vdec, v, vmin
+	case 2:
+		r, g, b = vmin, v, vinc
+	case 3:
+		r, g, b = vmin, vdec, v
+	case 4:
+		r, g, b = vinc, vmin, v
+	case 5:
+		r, g, b = v, vmin, vdec
 	}
-
-	r = r1 + m
-	b = b1 + m
-	g = g1 + m
 
 	return
 }

@@ -71,6 +71,10 @@ func (f *cropFilter) Copy() Filter {
 }
 
 func Crop(pos Position, size Size) Filter {
+	if pos.X == 0 && pos.Y == 0 && size.Height == 1 && size.Width == 1 {
+		return nil
+	}
+
 	return &cropFilter{
 		pos:  pos,
 		size: size,

@@ -36,7 +36,10 @@ func (f *cropFilter) Apply(dst draw.Image, src image.Image, parallel bool) {
 }
 
 func (f *cropFilter) Merge(filter Filter) bool {
-	filt := filter.(*cropFilter)
+	filt, ok := filter.(*cropFilter)
+	if !ok {
+		return false
+	}
 
 	f.pos.X += filt.pos.X * f.size.Width
 	f.pos.Y += filt.pos.Y * f.size.Height
@@ -48,7 +51,10 @@ func (f *cropFilter) Merge(filter Filter) bool {
 }
 
 func (f *cropFilter) Undo(filter Filter) bool {
-	filt := filter.(*cropFilter)
+	filt, ok := filter.(*cropFilter)
+	if !ok {
+		return false
+	}
 
 	f.size.Height /= filt.size.Height
 	f.size.Width /= filt.size.Width

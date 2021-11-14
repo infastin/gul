@@ -126,17 +126,10 @@ func (res *resampler) resampleSegment(dst []pixel, src []pixel, clist [][]contri
 		var r, g, b, a float32
 		for _, c := range clist[i] {
 			col := src[c.index]
-			wa := col.a * c.weight
-			r += col.r * wa
-			g += col.g * wa
-			b += col.b * wa
-			a += wa
-		}
-
-		if a != 0 {
-			r /= a
-			g /= a
-			b /= a
+			r += col.r * c.weight
+			g += col.g * c.weight
+			b += col.b * c.weight
+			a += col.a * c.weight
 		}
 
 		dst[i] = pixel{r, g, b, a}

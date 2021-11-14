@@ -129,14 +129,22 @@ type invertFilter struct {
 }
 
 func (f *invertFilter) Merge(filter Filter) bool {
-	filt := filter.(*invertFilter)
+	filt, ok := filter.(*invertFilter)
+	if !ok {
+		return false
+	}
+
 	f.state ^= filt.state
 	f.mergeCount++
 	return true
 }
 
 func (f *invertFilter) Undo(filter Filter) bool {
-	filt := filter.(*invertFilter)
+	filt, ok := filter.(*invertFilter)
+	if !ok {
+		return false
+	}
+
 	f.state = f.state ^ filt.state
 	f.mergeCount--
 	return f.mergeCount == 0
@@ -173,7 +181,10 @@ type contrastFilter struct {
 }
 
 func (f *contrastFilter) Merge(filter Filter) bool {
-	filt := filter.(*contrastFilter)
+	filt, ok := filter.(*contrastFilter)
+	if !ok {
+		return false
+	}
 
 	r1 := f.data.(float32)
 	r2 := filt.data.(float32)
@@ -186,7 +197,10 @@ func (f *contrastFilter) Merge(filter Filter) bool {
 }
 
 func (f *contrastFilter) Undo(filter Filter) bool {
-	filt := filter.(*contrastFilter)
+	filt, ok := filter.(*contrastFilter)
+	if !ok {
+		return false
+	}
 
 	r1 := f.data.(float32)
 	r2 := filt.data.(float32)
@@ -219,10 +233,10 @@ func Contrast(ratio float32) Filter {
 		colorchanFilter: colorchanFilter{
 			fn: func(f float32, data interface{}) float32 {
 				rat := data.(float32)
-				rat = gm32.Clamp(rat, -1, 1)
-				alpha := rat + 1
+				alpha := gm32.Clamp(rat, -1, 1) + 1
+				c := alpha*(f-0.5) + 0.5
 
-				return gm32.Clamp(alpha*f, 0, 1)
+				return gm32.Clamp(c, 0, 1)
 			},
 			useLut: false,
 			data:   ratio,
@@ -237,7 +251,10 @@ type brightnessFilter struct {
 }
 
 func (f *brightnessFilter) Merge(filter Filter) bool {
-	filt := filter.(*brightnessFilter)
+	filt, ok := filter.(*brightnessFilter)
+	if !ok {
+		return false
+	}
 
 	r1 := f.data.(float32)
 	r2 := filt.data.(float32)
@@ -250,7 +267,10 @@ func (f *brightnessFilter) Merge(filter Filter) bool {
 }
 
 func (f *brightnessFilter) Undo(filter Filter) bool {
-	filt := filter.(*brightnessFilter)
+	filt, ok := filter.(*brightnessFilter)
+	if !ok {
+		return false
+	}
 
 	r1 := f.data.(float32)
 	r2 := filt.data.(float32)
@@ -289,6 +309,87 @@ func Brightness(ratio float32) Filter {
 			},
 			useLut: false,
 			data:   ratio,
+		},
+		mergeCount: 1,
+	}
+}
+
+type brightnessContrastVal struct {
+	bratio, cratio float32
+}
+
+type brightnessContrastFilter struct {
+	colorchanFilter
+	mergeCount uint
+}
+
+func (f *brightnessContrastFilter) Merge(filter Filter) bool {
+	filt, ok := filter.(*brightnessContrastFilter)
+	if !ok {
+		return false
+	}
+
+	v1 := f.data.(brightnessContrastVal)
+	v2 := filt.data.(brightnessContrastVal)
+
+	br := gm32.Clamp(v1.bratio+v2.bratio, -1, 1)
+	cr := gm32.Clamp(v1.cratio+v2.cratio, -1, 1)
+
+	f.data = brightnessContrastVal{br, cr}
+	f.mergeCount++
+
+	return true
+}
+
+func (f *brightnessContrastFilter) Undo(filter Filter) bool {
+	filt, ok := filter.(*brightnessContrastFilter)
+	if !ok {
+		return false
+	}
+
+	v1 := f.data.(brightnessContrastVal)
+	v2 := filt.data.(brightnessContrastVal)
+
+	br := gm32.Clamp(v1.bratio-v2.bratio, -1, 1)
+	cr := gm32.Clamp(v1.cratio-v2.cratio, -1, 1)
+
+	f.data = brightnessContrastVal{br, cr}
+	f.mergeCount--
+
+	return f.mergeCount == 0
+}
+
+func (f *brightnessContrastFilter) Skip() bool {
+	v := f.data.(brightnessContrastVal)
+	return v.bratio == 0 && v.cratio == 0
+}
+
+func (f *brightnessContrastFilter) Copy() Filter {
+	return &brightnessContrastFilter{
+		colorchanFilter: f.colorchanFilter,
+		mergeCount:      f.mergeCount,
+	}
+}
+
+func BrightnessContrast(bratio, cratio float32) Filter {
+	if bratio == 0 && cratio == 0 {
+		return nil
+	}
+
+	val := brightnessContrastVal{bratio, cratio}
+
+	return &brightnessContrastFilter{
+		colorchanFilter: colorchanFilter{
+			fn: func(f float32, data interface{}) float32 {
+				v := data.(brightnessContrastVal)
+				alpha := gm32.Clamp(v.cratio, -1, 1) + 1
+				beta := gm32.Clamp(v.bratio, -1, 1)
+				c := alpha*(f-0.5) + 0.5 + beta
+
+				return gm32.Clamp(c, 0, 1)
+			},
+			data:   val,
+			useLut: false,
 		},
 		mergeCount: 1,
 	}
@@ -350,12 +451,20 @@ type grayscaleFilter struct {
 	mergeCount uint
 }
 
-func (f *grayscaleFilter) Merge(Filter) bool {
+func (f *grayscaleFilter) Merge(filter Filter) bool {
+	if _, ok := filter.(*grayscaleFilter); !ok {
+		return false
+	}
+
 	f.mergeCount++
 	return true
 }
 
-func (f *grayscaleFilter) Undo(Filter) bool {
+func (f *grayscaleFilter) Undo(filter Filter) bool {
+	if _, ok := filter.(*grayscaleFilter); !ok {
+		return false
+	}
+
 	f.mergeCount--
 	return f.mergeCount == 0
 }
@@ -385,7 +494,10 @@ type sepiaFilter struct {
 }
 
 func (f *sepiaFilter) Merge(filter Filter) bool {
-	filt := filter.(*sepiaFilter)
+	filt, ok := filter.(*sepiaFilter)
+	if !ok {
+		return false
+	}
 
 	r1 := f.data.(float32)
 	r2 := filt.data.(float32)
@@ -398,7 +510,10 @@ func (f *sepiaFilter) Merge(filter Filter) bool {
 }
 
 func (f *sepiaFilter) Undo(filter Filter) bool {
-	filt := filter.(*sepiaFilter)
+	filt, ok := filter.(*sepiaFilter)
+	if !ok {
+		return false
+	}
 
 	r1 := f.data.(float32)
 	r2 := filt.data.(float32)
@@ -467,7 +582,10 @@ type hsbFilter struct {
 }
 
 func (f *hsbFilter) Merge(filter Filter) bool {
-	filt := filter.(*hsbFilter)
+	filt, ok := filter.(*hsbFilter)
+	if !ok {
+		return false
+	}
 
 	hsb1 := f.data.(hsbDiff)
 	hsb2 := filt.data.(hsbDiff)
@@ -483,7 +601,10 @@ func (f *hsbFilter) Merge(filter Filter) bool {
 }
 
 func (f *hsbFilter) Undo(filter Filter) bool {
-	filt := filter.(*hsbFilter)
+	filt, ok := filter.(*hsbFilter)
+	if !ok {
+		return false
+	}
 
 	hsb1 := f.data.(hsbDiff)
 	hsb2 := filt.data.(hsbDiff)
@@ -546,7 +667,10 @@ type hslFilter struct {
 }
 
 func (f *hslFilter) Merge(filter Filter) bool {
-	filt := filter.(*hslFilter)
+	filt, ok := filter.(*hslFilter)
+	if !ok {
+		return false
+	}
 
 	hsl1 := f.data.(hslDiff)
 	hsl2 := filt.data.(hslDiff)
@@ -562,7 +686,10 @@ func (f *hslFilter) Merge(filter Filter) bool {
 }
 
 func (f *hslFilter) Undo(filter Filter) bool {
-	filt := filter.(*hslFilter)
+	filt, ok := filter.(*hslFilter)
+	if !ok {
+		return false
+	}
 
 	hsl1 := f.data.(hslDiff)
 	hsl2 := filt.data.(hslDiff)

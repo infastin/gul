@@ -47,7 +47,10 @@ func (f *transformFilter) Apply(dst draw.Image, src image.Image, parallel bool) 
 }
 
 func (f *transformFilter) Merge(filter Filter) bool {
-	filt := filter.(*transformFilter)
+	filt, ok := filter.(*transformFilter)
+	if !ok {
+		return false
+	}
 
 	if f.transformer == nil {
 		f.transformer = filt.transformer
@@ -69,7 +72,10 @@ func (f *transformFilter) Skip() bool {
 }
 
 func (f *transformFilter) Undo(filter Filter) bool {
-	filt := filter.(*transformFilter)
+	filt, ok := filter.(*transformFilter)
+	if !ok {
+		return false
+	}
 
 	if filt.transformer == nil {
 		return false

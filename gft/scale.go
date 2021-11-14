@@ -33,7 +33,10 @@ func (f *scaleFilter) Apply(dst draw.Image, src image.Image, parallel bool) {
 }
 
 func (f *scaleFilter) Merge(filter Filter) bool {
-	filt := filter.(*scaleFilter)
+	filt, ok := filter.(*scaleFilter)
+	if !ok {
+		return false
+	}
 
 	f.scaleX *= filt.scaleX
 	f.scaleY *= filt.scaleY
@@ -48,7 +51,10 @@ func (f *scaleFilter) Merge(filter Filter) bool {
 }
 
 func (f *scaleFilter) Undo(filter Filter) bool {
-	filt := filter.(*scaleFilter)
+	filt, ok := filter.(*scaleFilter)
+	if !ok {
+		return false
+	}
 
 	f.scaleX /= filt.scaleX
 	f.scaleY /= filt.scaleY

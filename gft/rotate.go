@@ -111,7 +111,10 @@ func (f *rotateFilter) Apply(dst draw.Image, src image.Image, parallel bool) {
 }
 
 func (f *rotateFilter) Merge(filter Filter) bool {
-	filt := filter.(*rotateFilter)
+	filt, ok := filter.(*rotateFilter)
+	if !ok {
+		return false
+	}
 
 	if f.interpolation != filt.interpolation {
 		return false
@@ -128,7 +131,10 @@ func (f *rotateFilter) Skip() bool {
 }
 
 func (f *rotateFilter) Undo(filter Filter) bool {
-	filt := filter.(*rotateFilter)
+	filt, ok := filter.(*rotateFilter)
+	if !ok {
+		return false
+	}
 
 	if f.interpolation != filt.interpolation {
 		return false

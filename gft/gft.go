@@ -6,15 +6,33 @@ import (
 	"reflect"
 )
 
+// Filter is an image filter
+// Must be a pointer
 type Filter interface {
+	// Returns the bounds after applying filter
 	Bounds(src image.Rectangle) image.Rectangle
+
+	// Applies the filter to the src image and draws the result to the dst image
 	Apply(dst draw.Image, src image.Image, parallel bool)
+
+	// If possible, combines two filters, writes the result to an instance of interface and returns true
+	// Otherwise, returns false
 	Merge(filter Filter) bool
+
+	// Returns true, if nothing will change after applying the filter
+	// Otherwise, returns false
 	Skip() bool
+
+	// If possible, decombines tow filters, writes the result to an instance of interface and returns true
+	// Otherwise, returns false
 	Undo(filter Filter) bool
+
+	// Returns a copy of the filter
 	Copy() Filter
 }
 
+// List of filters, which allows applying multiple filters at once
+// And makes use of filters' Merge, Undo and Skip methods
 type List struct {
 	filters []Filter
 }
@@ -41,9 +59,13 @@ func (l *List) Empty() bool {
 
 func (l *List) Add(filt Filter) {
 	if len(l.filters) != 0 {
-		last := len(l.filters) - 1
-		if reflect.TypeOf(l.filters[last]) == reflect.TypeOf(filt) {
-			if l.filters[last].Merge(filt) {
+		last := l.filters[len(l.filters)-1]
+		if reflect.TypeOf(last) == reflect.TypeOf(filt) {
+			if last.Merge(filt) {
+				if last.Skip() {
+					l.filters = l.filters[:len(l.filters)-1]
+				}
+
 				return
 			}
 		}
@@ -70,10 +92,6 @@ func (l *List) Undo(filt Filter) {
 func (l *List) Bounds(src image.Rectangle) image.Rectangle {
 	dst := src
 	for _, filt := range l.filters {
-		if filt.Skip() {
-			continue
-		}
-
 		dst = filt.Bounds(dst)
 	}
 	return dst
@@ -85,41 +103,22 @@ func (l *List) Apply(dst draw.Image, src image.Image, parallel bool) {
 		return
 	}
 
-	first, last := 0, len(l.filters)-1
 	var tmpDst draw.Image
 	var tmpSrc image.Image
 
 	for i, filt := range l.filters {
-		if filt.Skip() {
-			if i == first {
-				first++
-			}
-
-			continue
-		}
-
-		if i == first {
+		if i == 0 {
 			tmpSrc = src
 		} else {
 			tmpSrc = tmpDst
 		}
 
-		if i == last {
+		if i == len(l.filters)-1 {
 			tmpDst = dst
 		} else {
 			tmpDst = image.NewRGBA(filt.Bounds(tmpSrc.Bounds()))
 		}
 
 		filt.Apply(tmpDst, tmpSrc, parallel)
-	}
-
-	if tmpDst != dst {
-		if tmpSrc == nil {
-			tmpSrc = src
-		} else {
-			tmpSrc = tmpDst
-		}
-
-		draw.Draw(dst, dst.Bounds(), tmpSrc, tmpSrc.Bounds().Min, draw.Over)
 	}
 }

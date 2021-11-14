@@ -162,6 +162,7 @@ func (f *invertFilter) Copy() Filter {
 	}
 }
 
+// Negates the colors of an image.
 func Invert() Filter {
 	return &invertFilter{
 		colorchanFilter: colorchanFilter{
@@ -224,6 +225,9 @@ func (f *contrastFilter) Copy() Filter {
 	}
 }
 
+// Changes contrast of an image.
+// The contrast ratio must be in the range [-1, 1].
+// The ratio can be in the range [-2, 2] for merging purposes.
 func Contrast(ratio float32) Filter {
 	if ratio == 0 {
 		return nil
@@ -294,6 +298,9 @@ func (f *brightnessFilter) Copy() Filter {
 	}
 }
 
+// Changes brightness of an image.
+// The brightness ratio must be in the range [-1, 1].
+// The ratio can be in the range [-2, 2] for merging purposes.
 func Brightness(ratio float32) Filter {
 	if ratio == 0 {
 		return nil
@@ -371,6 +378,9 @@ func (f *brightnessContrastFilter) Copy() Filter {
 	}
 }
 
+// Changes brightness and contrast of an image.
+// The brightness ratio and contrast ratio must be in the range [-1, 1].
+// The ratios can be in the range [-2, 2] for merging purposes.
 func BrightnessContrast(bratio, cratio float32) Filter {
 	if bratio == 0 && cratio == 0 {
 		return nil
@@ -476,6 +486,7 @@ func (f *grayscaleFilter) Copy() Filter {
 	}
 }
 
+// Grayscales an image.
 func Grayscale() Filter {
 	return &grayscaleFilter{
 		colorFilter: colorFilter{
@@ -537,6 +548,9 @@ func (f *sepiaFilter) Copy() Filter {
 	}
 }
 
+// Creates sepia-toned image.
+// The ratio must be in the range [0, 1].
+// Can be in the range [-1, 1] for merging purposes.
 func Sepia(ratio float32) Filter {
 	if ratio == 0 {
 		return nil
@@ -631,6 +645,9 @@ func (f *hsbFilter) Copy() Filter {
 	}
 }
 
+// Changes HSB of each color in the image.
+// Each value must be in the range [-1, 1].
+// Can be in the range [-2, 2] for merging purposes.
 func HSB(h, s, b float32) Filter {
 	if h == 0 && s == 0 && b == 0 {
 		return nil
@@ -716,6 +733,9 @@ func (f *hslFilter) Copy() Filter {
 	}
 }
 
+// Changes HSL of each color in the image.
+// Each value must be in the range [-1, 1].
+// Can be in the range [-2, 2] for merging purposes.
 func HSL(h, s, l float32) Filter {
 	if h == 0 && s == 0 && l == 0 {
 		return nil

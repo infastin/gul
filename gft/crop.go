@@ -76,6 +76,10 @@ func (f *cropFilter) Copy() Filter {
 	}
 }
 
+// Crops the image starting at given position with rectangle of given size.
+// The position and size values should be in the range [0, 1].
+// Example: You have an image and you want to crop the bottom-right quarter of it.
+// Then pos will be (0.5, 0.5) and size will be (0.5, 0.5).
 func Crop(pos Position, size Size) Filter {
 	if pos.X == 0 && pos.Y == 0 && size.Height == 1 && size.Width == 1 {
 		return nil

@@ -97,6 +97,7 @@ func (f *transformFilter) Copy() Filter {
 	}
 }
 
+// Transform an image using given Transformer.
 func Transform(transformer Transformer) Filter {
 	return &transformFilter{
 		transformer: transformer,

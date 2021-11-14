@@ -86,7 +86,7 @@ func (f *scaleFilter) Copy() Filter {
 // Scales an image by scaleX horizontally and by scaleY vertically using given ResamplingFilter.
 // The rfiltScaleX and rfiltScaleY values less than 1.0 cause aliasing, but create sharper looking mips.
 // The values greater than 1.0 cause anti-aliasing, but create more blurred looking mips.
-// Merge multiplies the scaling parameters
+// Merge multiplies the scaling parameters.
 func Scale(scaleX, scaleY float32, rfilt ResamplingFilter, rfiltScaleX, rfiltScaleY float32) Filter {
 	if scaleX == 1 && scaleY == 1 {
 		return nil

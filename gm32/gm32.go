@@ -10,6 +10,21 @@ func Sincos(x float32) (float32, float32) {
 	return float32(sin), float32(cos)
 }
 
+func Sin(x float32) float32 {
+	sin := math.Sin(float64(x))
+	return float32(sin)
+}
+
+func Cos(x float32) float32 {
+	cos := math.Cos(float64(x))
+	return float32(cos)
+}
+
+func Tan(x float32) float32 {
+	tan := math.Tan(float64(x))
+	return float32(tan)
+}
+
 func Sinc(x float32) float32 {
 	f := gm64.Sinc(float64(x))
 	return float32(f)

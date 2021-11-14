@@ -1,3 +1,4 @@
+// It is basically non-direct fork of GIFT (https://github.com/disintegration/gift).
 package gft
 
 import (
@@ -6,33 +7,35 @@ import (
 	"reflect"
 )
 
-// Filter is an image filter
-// Must be a pointer
+// Filter is an image filter.
+// Must be a pointer.
 type Filter interface {
-	// Returns the bounds after applying filter
+	// Returns the bounds after applying filter.
 	Bounds(src image.Rectangle) image.Rectangle
 
-	// Applies the filter to the src image and draws the result to the dst image
+	// Applies the filter to the src image and draws the result to the dst image.
 	Apply(dst draw.Image, src image.Image, parallel bool)
 
-	// If possible, combines two filters, writes the result to an instance of interface and returns true
-	// Otherwise, returns false
+	// If possible, combines two filters, writes the result to an instance of interface and returns true.
+	// Otherwise, returns false.
 	Merge(filter Filter) bool
 
-	// Returns true, if nothing will change after applying the filter
-	// Otherwise, returns false
+	// Returns true, if nothing will change after applying the filter.
+	// Otherwise, returns false.
 	Skip() bool
 
-	// If possible, decombines tow filters, writes the result to an instance of interface and returns true
-	// Otherwise, returns false
+	// If possible, decombines tow filters and writes the result to an instance of interface.
+	// If not, returns false.
+	// If got nothing after decombination, returns true.
+	// Otherwise, returns false.
 	Undo(filter Filter) bool
 
-	// Returns a copy of the filter
+	// Returns a copy of the filter.
 	Copy() Filter
 }
 
-// List of filters, which allows applying multiple filters at once
-// And makes use of filters' Merge, Undo and Skip methods
+// List of filters, which allows applying multiple filters at once.
+// And makes use of filters' Merge, Undo and Skip methods.
 type List struct {
 	filters []Filter
 }

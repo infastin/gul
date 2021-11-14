@@ -154,7 +154,7 @@ func (f *rotateFilter) Copy() Filter {
 	}
 }
 
-// Rotates the image.
+// Rotates the image using given interpolation method.
 // The angle is given in radians.
 func Rotate(rad float32, interpolation Interpolation) Filter {
 	if gm32.Mod(rad, 2*math.Pi) == 0 {

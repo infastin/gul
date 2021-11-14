@@ -9,7 +9,7 @@ type Transformer interface {
 	Bounds(src image.Rectangle) image.Rectangle
 
 	// Returns the new point after transformation.
-	// Last two booleans stand for opposite direction of the x and y coordinates
+	// Last two booleans stand for opposite direction of the x and y coordinates.
 	// Example: if x = 10 and image width = 100, then
 	// setting oppX to true will mean that x = 89.
 	Transform(sx, sy int) (dx, dy int, oppX, oppY bool)
@@ -33,7 +33,7 @@ var (
 	// Flips an image vertically.
 	FlipVTransformer Transformer = &flipvTransformer{}
 
-	// Changes each (x, y) pixel to (y, x) pixel
+	// Changes each (x, y) pixel to (y, x) pixel.
 	TransposeTransformer Transformer = &transposeTransformer{}
 
 	// Changes each (x, y) pixel to (y, x) pixel and rotates

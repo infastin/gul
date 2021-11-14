@@ -2,6 +2,10 @@ package gm32
 
 import "github.com/infastin/gul/matrix"
 
+func InterpolateLinear(v0, v1, t float32) float32 {
+	return (1-t)*v0 + t*v1
+}
+
 func InterpolateBilinear(v00, v01, v10, v11, fx, fy float32) float32 {
 	tmp := (1-fy)*((1-fx)*v00+fx*v01) +
 		fy*((1-fx)*v10+fx*v11)

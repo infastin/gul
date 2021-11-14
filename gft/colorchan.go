@@ -285,9 +285,10 @@ func (f *colorchanFilterFunc) Fn(x float32) float32 {
 	return f.fn(x)
 }
 
-func ColorchanFilterFunc(fn func(x float32) float32) ColorchanFilter {
+func ColorchanFilterFunc(fn func(x float32) float32, useLut bool) ColorchanFilter {
 	return &colorchanFilterFunc{
-		fn: fn,
+		fn:     fn,
+		useLut: useLut,
 	}
 }
 

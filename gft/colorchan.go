@@ -11,9 +11,10 @@ import (
 
 type ColorchanFilter interface {
 	Fn(x float32) float32
+	Prepare()
 	UseLut() bool
 	Merge(filter ColorchanFilter)
-	Undo(filter ColorchanFilter) bool
+	Undo(filter ColorchanFilter)
 	Skip() bool
 	Copy() ColorchanFilter
 	CanMerge(filter ColorchanFilter) bool
@@ -21,8 +22,9 @@ type ColorchanFilter interface {
 }
 
 type combineColorchanFilter struct {
-	filters []ColorchanFilter
-	luts    [][]float32
+	filters    []ColorchanFilter
+	luts       [][]float32
+	mergeCount uint
 }
 
 func (f *combineColorchanFilter) Merge(filter Filter) bool {
@@ -58,6 +60,8 @@ func (f *combineColorchanFilter) Merge(filter Filter) bool {
 		f.filters[i].Merge(filt.filters[i])
 	}
 
+	f.mergeCount++
+
 	return true
 }
 
@@ -81,18 +85,17 @@ func (f *combineColorchanFilter) Undo(filter Filter) bool {
 		}
 	}
 
-	numTrue := 0
 	for i := 0; i < len(f.filters); i++ {
 		if filt.filters[i] == nil {
 			continue
 		}
 
-		if f.filters[i].Undo(filt.filters[i]) {
-			numTrue++
-		}
+		f.filters[i].Undo(filt.filters[i])
 	}
 
-	return numTrue == len(f.filters)
+	f.mergeCount--
+
+	return f.mergeCount == 0
 }
 
 func (f *combineColorchanFilter) Skip() bool {
@@ -110,7 +113,9 @@ func (f *combineColorchanFilter) Skip() bool {
 }
 
 func (f *combineColorchanFilter) Copy() Filter {
-	r := &combineColorchanFilter{}
+	r := &combineColorchanFilter{
+		mergeCount: f.mergeCount,
+	}
 
 	r.filters = make([]ColorchanFilter, len(f.filters))
 	for i := 0; i < len(f.filters); i++ {
@@ -167,6 +172,8 @@ func (f *combineColorchanFilter) Apply(dst draw.Image, src image.Image, parallel
 		if filt == nil {
 			continue
 		}
+
+		filt.Prepare()
 
 		if filt.UseLut() {
 			lutSize := len(f.luts[i])
@@ -242,8 +249,9 @@ func CombineColorchanFilters(filters ...ColorchanFilter) Filter {
 	}
 
 	return &combineColorchanFilter{
-		filters: filters,
-		luts:    make([][]float32, len(filters)),
+		filters:    filters,
+		luts:       make([][]float32, len(filters)),
+		mergeCount: 1,
 	}
 }
 
@@ -262,9 +270,7 @@ func (f *colorchanFilterFunc) CanUndo(ColorchanFilter) bool {
 	return false
 }
 
-func (f *colorchanFilterFunc) Undo(ColorchanFilter) bool {
-	return false
-}
+func (f *colorchanFilterFunc) Undo(ColorchanFilter) {}
 
 func (f *colorchanFilterFunc) Skip() bool {
 	return false
@@ -281,6 +287,8 @@ func (f *colorchanFilterFunc) UseLut() bool {
 	return f.useLut
 }
 
+func (f *colorchanFilterFunc) Prepare() {}
+
 func (f *colorchanFilterFunc) Fn(x float32) float32 {
 	return f.fn(x)
 }
@@ -293,8 +301,7 @@ func ColorchanFilterFunc(fn func(x float32) float32, useLut bool) ColorchanFilte
 }
 
 type invertFilter struct {
-	mergeCount uint
-	state      byte
+	state byte
 }
 
 func (f *invertFilter) CanMerge(filter ColorchanFilter) bool {
@@ -308,14 +315,11 @@ func (f *invertFilter) CanMerge(filter ColorchanFilter) bool {
 func (f *invertFilter) Merge(filter ColorchanFilter) {
 	filt := filter.(*invertFilter)
 	f.state ^= filt.state
-	f.mergeCount++
 }
 
-func (f *invertFilter) Undo(filter ColorchanFilter) bool {
+func (f *invertFilter) Undo(filter ColorchanFilter) {
 	filt := filter.(*invertFilter)
 	f.state = f.state ^ filt.state
-	f.mergeCount--
-	return f.mergeCount == 0
 }
 
 func (f *invertFilter) CanUndo(filter ColorchanFilter) bool {
@@ -336,10 +340,11 @@ func (f *invertFilter) UseLut() bool {
 
 func (f *invertFilter) Copy() ColorchanFilter {
 	return &invertFilter{
-		state:      f.state,
-		mergeCount: f.mergeCount,
+		state: f.state,
 	}
 }
+
+func (f *invertFilter) Prepare() {}
 
 func (f *invertFilter) Fn(x float32) float32 {
 	return 1 - x
@@ -348,14 +353,12 @@ func (f *invertFilter) Fn(x float32) float32 {
 // Negates the colors of an image.
 func Invert() ColorchanFilter {
 	return &invertFilter{
-		state:      1,
-		mergeCount: 1,
+		state: 1,
 	}
 }
 
 type gammaFilter struct {
-	gamma      float32
-	mergeCount uint
+	gamma float32
 }
 
 func (f *gammaFilter) CanMerge(filter ColorchanFilter) bool {
@@ -368,8 +371,7 @@ func (f *gammaFilter) CanMerge(filter ColorchanFilter) bool {
 
 func (f *gammaFilter) Merge(filter ColorchanFilter) {
 	filt := filter.(*gammaFilter)
-	f.gamma += filt.gamma
-	f.mergeCount++
+	f.gamma = gm32.Max(1.0e-5, f.gamma+filt.gamma)
 }
 
 func (f *gammaFilter) CanUndo(filter ColorchanFilter) bool {
@@ -380,24 +382,23 @@ func (f *gammaFilter) CanUndo(filter ColorchanFilter) bool {
 	return false
 }
 
-func (f *gammaFilter) Undo(filter ColorchanFilter) bool {
+func (f *gammaFilter) Undo(filter ColorchanFilter) {
 	filt := filter.(*gammaFilter)
-
-	f.gamma -= filt.gamma
-	f.mergeCount--
-
-	return f.mergeCount == 0
+	f.gamma = gm32.Max(1.0e-5, f.gamma-filt.gamma)
 }
 
 func (f *gammaFilter) Skip() bool {
-	return f.gamma == 0
+	return f.gamma == 1
 }
 
 func (f *gammaFilter) Copy() ColorchanFilter {
 	return &gammaFilter{
-		gamma:      f.gamma,
-		mergeCount: f.mergeCount,
+		gamma: f.gamma,
 	}
+}
+
+func (f *gammaFilter) Prepare() {
+	f.gamma = gm32.Max(1.0e-5, f.gamma)
 }
 
 func (f *gammaFilter) Fn(x float32) float32 {
@@ -418,14 +419,12 @@ func Gamma(gamma float32) ColorchanFilter {
 	}
 
 	return &gammaFilter{
-		gamma:      gamma,
-		mergeCount: 1,
+		gamma: gamma,
 	}
 }
 
 type contrastFilter struct {
-	contrast   float32
-	mergeCount uint
+	contrast float32
 }
 
 func (f *contrastFilter) CanMerge(filter ColorchanFilter) bool {
@@ -439,7 +438,6 @@ func (f *contrastFilter) CanMerge(filter ColorchanFilter) bool {
 func (f *contrastFilter) Merge(filter ColorchanFilter) {
 	filt := filter.(*contrastFilter)
 	f.contrast = gm32.Clamp(f.contrast+filt.contrast, -100, 100)
-	f.mergeCount++
 }
 
 func (f *contrastFilter) CanUndo(filter ColorchanFilter) bool {
@@ -450,13 +448,9 @@ func (f *contrastFilter) CanUndo(filter ColorchanFilter) bool {
 	return false
 }
 
-func (f *contrastFilter) Undo(filter ColorchanFilter) bool {
+func (f *contrastFilter) Undo(filter ColorchanFilter) {
 	filt := filter.(*contrastFilter)
-
 	f.contrast = gm32.Clamp(f.contrast-filt.contrast, -100, 100)
-	f.mergeCount--
-
-	return f.mergeCount == 0
 }
 
 func (f *contrastFilter) Skip() bool {
@@ -465,13 +459,16 @@ func (f *contrastFilter) Skip() bool {
 
 func (f *contrastFilter) Copy() ColorchanFilter {
 	return &contrastFilter{
-		contrast:   f.contrast,
-		mergeCount: f.mergeCount,
+		contrast: f.contrast,
 	}
 }
 
+func (f *contrastFilter) Prepare() {
+	f.contrast = gm32.Clamp(f.contrast, -100, 100)
+}
+
 func (f *contrastFilter) Fn(x float32) float32 {
-	alpha := (gm32.Clamp(f.contrast, -100, 100) / 100) + 1
+	alpha := (f.contrast / 100) + 1
 	alpha = gm32.Tan(alpha * (math.Pi / 4))
 
 	c := (x-0.5)*alpha + 0.5
@@ -492,14 +489,12 @@ func Contrast(perc float32) ColorchanFilter {
 	}
 
 	return &contrastFilter{
-		contrast:   perc,
-		mergeCount: 1,
+		contrast: perc,
 	}
 }
 
 type brightnessFilter struct {
 	brightness float32
-	mergeCount uint
 }
 
 func (f *brightnessFilter) CanMerge(filter ColorchanFilter) bool {
@@ -513,7 +508,6 @@ func (f *brightnessFilter) CanMerge(filter ColorchanFilter) bool {
 func (f *brightnessFilter) Merge(filter ColorchanFilter) {
 	filt := filter.(*brightnessFilter)
 	f.brightness = gm32.Clamp(f.brightness+filt.brightness, -100, 100)
-	f.mergeCount++
 }
 
 func (f *brightnessFilter) CanUndo(filter ColorchanFilter) bool {
@@ -524,13 +518,9 @@ func (f *brightnessFilter) CanUndo(filter ColorchanFilter) bool {
 	return false
 }
 
-func (f *brightnessFilter) Undo(filter ColorchanFilter) bool {
+func (f *brightnessFilter) Undo(filter ColorchanFilter) {
 	filt := filter.(*brightnessFilter)
-
-	f.mergeCount--
-
 	f.brightness = gm32.Clamp(f.brightness-filt.brightness, -100, 100)
-	return f.mergeCount == 0
 }
 
 func (f *brightnessFilter) Skip() bool {
@@ -540,12 +530,15 @@ func (f *brightnessFilter) Skip() bool {
 func (f *brightnessFilter) Copy() ColorchanFilter {
 	return &brightnessFilter{
 		brightness: f.brightness,
-		mergeCount: f.mergeCount,
 	}
 }
 
+func (f *brightnessFilter) Prepare() {
+	f.brightness = gm32.Clamp(f.brightness, -100, 100)
+}
+
 func (f *brightnessFilter) Fn(x float32) float32 {
-	beta := gm32.Clamp(f.brightness, -100, 100) / 100
+	beta := f.brightness / 100
 
 	if beta < 0 {
 		x *= (1 + beta)
@@ -571,6 +564,5 @@ func Brightness(perc float32) ColorchanFilter {
 
 	return &brightnessFilter{
 		brightness: perc,
-		mergeCount: 1,
 	}
 }

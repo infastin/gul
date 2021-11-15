@@ -20,7 +20,7 @@ func New64(m, n int) func(data ...float64) *Matrix64 {
 	return ctor
 }
 
-func (m1 *Matrix64) Sum(m2 *Matrix64) *Matrix64 {
+func (m1 *Matrix64) Add(m2 *Matrix64) *Matrix64 {
 	if m1.M != m2.M || m1.N != m2.N {
 		panic("the first and second matrices have different dimensions")
 	}
@@ -106,7 +106,7 @@ func New32(m, n int) func(data ...float32) *Matrix32 {
 	return ctor
 }
 
-func (m1 *Matrix32) Sum(m2 *Matrix32) *Matrix32 {
+func (m1 *Matrix32) Add(m2 *Matrix32) *Matrix32 {
 	if m1.M != m2.M || m1.N != m2.N {
 		panic("the first and second matrices have different dimensions")
 	}

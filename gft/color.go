@@ -11,8 +11,9 @@ import (
 
 type ColorFilter interface {
 	Fn(pix pixel) pixel
+	Prepare()
 	Merge(filter ColorFilter)
-	Undo(filter ColorFilter) bool
+	Undo(filter ColorFilter)
 	Skip() bool
 	Copy() ColorFilter
 	CanMerge(filter ColorFilter) bool
@@ -20,7 +21,8 @@ type ColorFilter interface {
 }
 
 type combineColorFilter struct {
-	filters []ColorFilter
+	filters    []ColorFilter
+	mergeCount uint
 }
 
 func (f *combineColorFilter) Merge(filter Filter) bool {
@@ -56,6 +58,8 @@ func (f *combineColorFilter) Merge(filter Filter) bool {
 		f.filters[i].Merge(filt.filters[i])
 	}
 
+	f.mergeCount++
+
 	return true
 }
 
@@ -79,18 +83,17 @@ func (f *combineColorFilter) Undo(filter Filter) bool {
 		}
 	}
 
-	numTrue := 0
 	for i := 0; i < len(f.filters); i++ {
 		if filt.filters[i] == nil {
 			continue
 		}
 
-		if f.filters[i].Undo(filt.filters[i]) {
-			numTrue++
-		}
+		f.filters[i].Undo(filt.filters[i])
 	}
 
-	return numTrue == len(f.filters)
+	f.mergeCount--
+
+	return f.mergeCount == 0
 }
 
 func (f *combineColorFilter) Skip() bool {
@@ -108,7 +111,9 @@ func (f *combineColorFilter) Skip() bool {
 }
 
 func (f *combineColorFilter) Copy() Filter {
-	r := &combineColorFilter{}
+	r := &combineColorFilter{
+		mergeCount: f.mergeCount,
+	}
 
 	r.filters = make([]ColorFilter, len(f.filters))
 	for i := 0; i < len(f.filters); i++ {
@@ -134,6 +139,14 @@ func (f *combineColorFilter) Apply(dst draw.Image, src image.Image, parallel boo
 	pixGetter := newPixelGetter(src)
 	pixSetter := newPixelSetter(dst)
 
+	for _, filt := range f.filters {
+		if filt == nil {
+			continue
+		}
+
+		filt.Prepare()
+	}
+
 	procs := 1
 	if parallel {
 		procs = 0
@@ -145,6 +158,10 @@ func (f *combineColorFilter) Apply(dst draw.Image, src image.Image, parallel boo
 				pix := pixGetter.getPixel(x, y)
 
 				for _, filt := range f.filters {
+					if filt == nil {
+						continue
+					}
+
 					pix = filt.Fn(pix)
 				}
 
@@ -172,7 +189,8 @@ func CombineColorFilters(filters ...ColorFilter) Filter {
 	}
 
 	return &combineColorFilter{
-		filters: filters,
+		filters:    filters,
+		mergeCount: 1,
 	}
 }
 
@@ -190,9 +208,7 @@ func (f *colorFilterFunc) CanUndo(ColorFilter) bool {
 	return false
 }
 
-func (f *colorFilterFunc) Undo(ColorFilter) bool {
-	return false
-}
+func (f *colorFilterFunc) Undo(ColorFilter) {}
 
 func (f *colorFilterFunc) Skip() bool {
 	return false
@@ -204,6 +220,8 @@ func (f *colorFilterFunc) Copy() ColorFilter {
 	}
 }
 
+func (f *colorFilterFunc) Prepare() {}
+
 func (f *colorFilterFunc) Fn(pix pixel) pixel {
 	return f.fn(pix)
 }
@@ -214,60 +232,8 @@ func ColorFilterFunc(fn func(pix pixel) pixel) ColorFilter {
 	}
 }
 
-type grayscaleFilter struct {
-	mergeCount uint
-}
-
-func (f *grayscaleFilter) CanMerge(filter ColorFilter) bool {
-	if _, ok := filter.(*grayscaleFilter); ok {
-		return true
-	}
-
-	return false
-}
-
-func (f *grayscaleFilter) Merge(filter ColorFilter) {
-	f.mergeCount++
-}
-
-func (f *grayscaleFilter) Undo(filter ColorFilter) bool {
-	f.mergeCount--
-	return f.mergeCount == 0
-}
-
-func (f *grayscaleFilter) CanUndo(filter ColorFilter) bool {
-	if _, ok := filter.(*grayscaleFilter); ok {
-		return true
-	}
-
-	return false
-}
-
-func (f *grayscaleFilter) Skip() bool {
-	return false
-}
-
-func (f *grayscaleFilter) Copy() ColorFilter {
-	return &grayscaleFilter{
-		mergeCount: f.mergeCount,
-	}
-}
-
-func (f *grayscaleFilter) Fn(pix pixel) pixel {
-	v := 0.299*pix.r + 0.587*pix.g + 0.114*pix.b
-	return pixel{v, v, v, pix.a}
-}
-
-// Grayscales an image.
-func Grayscale() ColorFilter {
-	return &grayscaleFilter{
-		mergeCount: 1,
-	}
-}
-
 type sepiaFilter struct {
 	percentage float32
-	mergeCount uint
 }
 
 func (f *sepiaFilter) CanMerge(filter ColorFilter) bool {
@@ -281,7 +247,6 @@ func (f *sepiaFilter) CanMerge(filter ColorFilter) bool {
 func (f *sepiaFilter) Merge(filter ColorFilter) {
 	filt := filter.(*sepiaFilter)
 	f.percentage = gm32.Clamp(f.percentage+filt.percentage, 0, 100)
-	f.mergeCount++
 }
 
 func (f *sepiaFilter) CanUndo(filter ColorFilter) bool {
@@ -292,21 +257,21 @@ func (f *sepiaFilter) CanUndo(filter ColorFilter) bool {
 	return false
 }
 
-func (f *sepiaFilter) Undo(filter ColorFilter) bool {
+func (f *sepiaFilter) Undo(filter ColorFilter) {
 	filt := filter.(*sepiaFilter)
-
 	f.percentage = gm32.Clamp(f.percentage-filt.percentage, 0, 100)
-	f.mergeCount--
-
-	return f.mergeCount == 0
 }
 
 func (f *sepiaFilter) Skip() bool {
 	return f.percentage == 0
 }
 
+func (f *sepiaFilter) Prepare() {
+	f.percentage = gm32.Clamp(f.percentage, 0, 100)
+}
+
 func (f *sepiaFilter) Fn(pix pixel) pixel {
-	rat := gm32.Clamp(f.percentage, 0, 100) / 100
+	rat := f.percentage / 100
 
 	rr := 1 - 0.607*rat
 	rg := 0.769 * rat
@@ -330,7 +295,6 @@ func (f *sepiaFilter) Fn(pix pixel) pixel {
 func (f *sepiaFilter) Copy() ColorFilter {
 	return &sepiaFilter{
 		percentage: f.percentage,
-		mergeCount: f.mergeCount,
 	}
 }
 
@@ -345,13 +309,11 @@ func Sepia(perc float32) ColorFilter {
 
 	return &sepiaFilter{
 		percentage: perc,
-		mergeCount: 1,
 	}
 }
 
 type hsbFilter struct {
-	h, s, b    float32
-	mergeCount uint
+	h, s, b float32
 }
 
 func (f *hsbFilter) CanMerge(filter ColorFilter) bool {
@@ -368,8 +330,6 @@ func (f *hsbFilter) Merge(filter ColorFilter) {
 	f.h = gm32.Clamp(f.h+filt.h, -360, 360)
 	f.s = gm32.Clamp(f.s+filt.s, -100, 100)
 	f.b = gm32.Clamp(f.b+filt.b, -100, 100)
-
-	f.mergeCount++
 }
 
 func (f *hsbFilter) CanUndo(filter ColorFilter) bool {
@@ -380,16 +340,12 @@ func (f *hsbFilter) CanUndo(filter ColorFilter) bool {
 	return false
 }
 
-func (f *hsbFilter) Undo(filter ColorFilter) bool {
+func (f *hsbFilter) Undo(filter ColorFilter) {
 	filt := filter.(*hsbFilter)
 
 	f.h = gm32.Clamp(f.h-filt.h, -360, 360)
 	f.s = gm32.Clamp(f.s-filt.s, -100, 100)
 	f.b = gm32.Clamp(f.b-filt.b, -100, 100)
-
-	f.mergeCount--
-
-	return f.mergeCount == 0
 }
 
 func (f *hsbFilter) Skip() bool {
@@ -398,17 +354,22 @@ func (f *hsbFilter) Skip() bool {
 
 func (f *hsbFilter) Copy() ColorFilter {
 	return &hsbFilter{
-		h:          f.h,
-		s:          f.s,
-		b:          f.b,
-		mergeCount: f.mergeCount,
+		h: f.h,
+		s: f.s,
+		b: f.b,
 	}
 }
 
+func (f *hsbFilter) Prepare() {
+	f.h = gm32.Clamp(f.h, -360, 360)
+	f.s = gm32.Clamp(f.s, -100, 100)
+	f.b = gm32.Clamp(f.b, -100, 100)
+}
+
 func (f *hsbFilter) Fn(pix pixel) pixel {
-	h0 := gm32.Clamp(f.h, -360, 360) / 360
-	s0 := gm32.Clamp(f.s, -100, 100) / 100
-	b0 := gm32.Clamp(f.b, -100, 100) / 100
+	h0 := f.h / 360
+	s0 := f.s / 100
+	b0 := f.b / 100
 
 	h1, s1, v1 := gcu.RGBToHSV(pix.r, pix.g, pix.b)
 
@@ -430,16 +391,14 @@ func HSB(h, s, b float32) ColorFilter {
 	}
 
 	return &hsbFilter{
-		h:          h,
-		s:          s,
-		b:          b,
-		mergeCount: 1,
+		h: h,
+		s: s,
+		b: b,
 	}
 }
 
 type hslFilter struct {
-	h, s, l    float32
-	mergeCount uint
+	h, s, l float32
 }
 
 func (f *hslFilter) CanMerge(filter ColorFilter) bool {
@@ -456,8 +415,6 @@ func (f *hslFilter) Merge(filter ColorFilter) {
 	f.h = gm32.Clamp(f.h+filt.h, -360, 360)
 	f.s = gm32.Clamp(f.s+filt.s, -100, 100)
 	f.l = gm32.Clamp(f.l+filt.l, -100, 100)
-
-	f.mergeCount++
 }
 
 func (f *hslFilter) CanUndo(filter ColorFilter) bool {
@@ -468,16 +425,12 @@ func (f *hslFilter) CanUndo(filter ColorFilter) bool {
 	return false
 }
 
-func (f *hslFilter) Undo(filter ColorFilter) bool {
+func (f *hslFilter) Undo(filter ColorFilter) {
 	filt := filter.(*hslFilter)
 
 	f.h = gm32.Clamp(f.h-filt.h, -360, 360)
 	f.s = gm32.Clamp(f.s-filt.s, -100, 100)
 	f.l = gm32.Clamp(f.l-filt.l, -100, 100)
-
-	f.mergeCount--
-
-	return f.mergeCount == 0
 }
 
 func (f *hslFilter) Skip() bool {
@@ -486,17 +439,22 @@ func (f *hslFilter) Skip() bool {
 
 func (f *hslFilter) Copy() ColorFilter {
 	return &hslFilter{
-		h:          f.h,
-		s:          f.s,
-		l:          f.l,
-		mergeCount: f.mergeCount,
+		h: f.h,
+		s: f.s,
+		l: f.l,
 	}
 }
 
+func (f *hslFilter) Prepare() {
+	f.h = gm32.Clamp(f.h, -360, 360)
+	f.s = gm32.Clamp(f.s, -100, 100)
+	f.l = gm32.Clamp(f.l, -100, 100)
+}
+
 func (f *hslFilter) Fn(pix pixel) pixel {
-	h0 := gm32.Clamp(f.h, -360, 360) / 360
-	s0 := gm32.Clamp(f.s, -100, 100) / 100
-	l0 := gm32.Clamp(f.l, -100, 100) / 100
+	h0 := f.h / 360
+	s0 := f.s / 100
+	l0 := f.l / 100
 
 	h1, s1, l1 := gcu.RGBToHSL(pix.r, pix.g, pix.b)
 
@@ -518,9 +476,251 @@ func HSL(h, s, l float32) ColorFilter {
 	}
 
 	return &hslFilter{
-		h:          h,
-		s:          s,
-		l:          l,
-		mergeCount: 1,
+		h: h,
+		s: s,
+		l: l,
 	}
+}
+
+type ColorLevels struct {
+	CyanRed      float32
+	MagentaGreen float32
+	YellloBlue   float32
+}
+
+func (cl1 ColorLevels) Add(cl2 ColorLevels) ColorLevels {
+	return ColorLevels{
+		CyanRed:      gm32.Clamp(cl1.CyanRed+cl2.CyanRed, -100, 100),
+		MagentaGreen: gm32.Clamp(cl1.MagentaGreen+cl2.MagentaGreen, -100, 100),
+		YellloBlue:   gm32.Clamp(cl1.YellloBlue+cl2.YellloBlue, -100, 100),
+	}
+}
+
+func (cl1 ColorLevels) Sub(cl2 ColorLevels) ColorLevels {
+	return ColorLevels{
+		CyanRed:      gm32.Clamp(cl1.CyanRed-cl2.CyanRed, -100, 100),
+		MagentaGreen: gm32.Clamp(cl1.MagentaGreen-cl2.MagentaGreen, -100, 100),
+		YellloBlue:   gm32.Clamp(cl1.YellloBlue-cl2.YellloBlue, -100, 100),
+	}
+}
+
+func (cl ColorLevels) Clamp() ColorLevels {
+	return ColorLevels{
+		CyanRed:      gm32.Clamp(cl.CyanRed, -100, 100),
+		MagentaGreen: gm32.Clamp(cl.MagentaGreen, -100, 100),
+		YellloBlue:   gm32.Clamp(cl.YellloBlue, -100, 100),
+	}
+}
+
+func (cl ColorLevels) IsZero() bool {
+	return cl.CyanRed == 0 && cl.MagentaGreen == 0 && cl.YellloBlue == 0
+}
+
+type colorBalanceFilter struct {
+	shadows            ColorLevels
+	midtones           ColorLevels
+	highlights         ColorLevels
+	preserveLuminosity bool
+}
+
+func (f *colorBalanceFilter) CanMerge(filter ColorFilter) bool {
+	if _, ok := filter.(*colorBalanceFilter); ok {
+		return true
+	}
+
+	return false
+}
+
+func (f *colorBalanceFilter) Merge(filter ColorFilter) {
+	filt := filter.(*colorBalanceFilter)
+
+	f.shadows = f.shadows.Add(filt.shadows)
+	f.midtones = f.midtones.Add(filt.midtones)
+	f.highlights = f.highlights.Add(filt.highlights)
+}
+
+func (f *colorBalanceFilter) CanUndo(filter ColorFilter) bool {
+	if _, ok := filter.(*colorBalanceFilter); ok {
+		return true
+	}
+
+	return false
+}
+
+func (f *colorBalanceFilter) Undo(filter ColorFilter) {
+	filt := filter.(*colorBalanceFilter)
+
+	f.shadows = f.shadows.Sub(filt.shadows)
+	f.midtones = f.midtones.Sub(filt.midtones)
+	f.highlights = f.highlights.Sub(filt.highlights)
+}
+
+func (f *colorBalanceFilter) Skip() bool {
+	return f.shadows.IsZero() && f.midtones.IsZero() && f.highlights.IsZero()
+}
+
+func (f *colorBalanceFilter) Copy() ColorFilter {
+	return &colorBalanceFilter{
+		shadows:            f.shadows,
+		midtones:           f.midtones,
+		highlights:         f.highlights,
+		preserveLuminosity: f.preserveLuminosity,
+	}
+}
+
+func (f *colorBalanceFilter) mask(val, lightness, shadows, midtones, highlights float32) float32 {
+	const (
+		a     = 0.25
+		b     = 0.333
+		scale = 0.7
+	)
+
+	shadows /= 100
+	midtones /= 100
+	highlights /= 100
+
+	shadows *= gm32.Clamp(((lightness-b)/-a)+0.5, 0, 1) * scale
+	midtones *= gm32.Clamp(((lightness-b)/a)+0.5, 0, 1) *
+		gm32.Clamp(((lightness+b-1)/-a)+0.5, 0, 1) * scale
+	highlights *= gm32.Clamp(((lightness+b-1)/a)+0.5, 0, 1) * scale
+
+	val += shadows
+	val += midtones
+	val += highlights
+	val = gm32.Clamp(val, 0, 1)
+
+	return val
+}
+
+func (f *colorBalanceFilter) Prepare() {
+	f.shadows = f.shadows.Clamp()
+	f.midtones = f.midtones.Clamp()
+	f.highlights = f.highlights.Clamp()
+}
+
+func (f *colorBalanceFilter) Fn(pix pixel) pixel {
+	_, _, l := gcu.RGBToHSL(pix.r, pix.g, pix.b)
+
+	rn := f.mask(pix.r, l, f.shadows.CyanRed, f.midtones.CyanRed, f.highlights.CyanRed)
+	gn := f.mask(pix.g, l, f.shadows.MagentaGreen, f.midtones.MagentaGreen, f.highlights.MagentaGreen)
+	bn := f.mask(pix.b, l, f.shadows.YellloBlue, f.midtones.YellloBlue, f.highlights.YellloBlue)
+
+	if f.preserveLuminosity {
+		h2, s2, _ := gcu.RGBToHSL(rn, gn, bn)
+		rn, gn, bn = gcu.HSLToRGB(h2, s2, l)
+	}
+
+	return pixel{rn, gn, bn, pix.a}
+}
+
+// Adjusts color distribution in an image.
+// Each color level  must be in the range [-100, 100].
+// The color levels can have any value for merging purposes.
+func ColorBalance(shadows, midtones, highlights ColorLevels, preserveLuminosity bool) ColorFilter {
+	if shadows.IsZero() && midtones.IsZero() && highlights.IsZero() {
+		return nil
+	}
+
+	return &colorBalanceFilter{
+		shadows:            shadows,
+		midtones:           midtones,
+		highlights:         highlights,
+		preserveLuminosity: preserveLuminosity,
+	}
+}
+
+type colorizeFilter struct {
+	h, s, l float32
+}
+
+func (f *colorizeFilter) CanMerge(filter ColorFilter) bool {
+	if _, ok := filter.(*colorizeFilter); ok {
+		return true
+	}
+
+	return false
+}
+
+func (f *colorizeFilter) Merge(filter ColorFilter) {
+	filt := filter.(*colorizeFilter)
+
+	f.h = gm32.Clamp(f.h+filt.h, 0, 360)
+	f.s = gm32.Clamp(f.s+filt.s, 0, 100)
+	f.l = gm32.Clamp(f.l+filt.l, -100, 100)
+}
+
+func (f *colorizeFilter) CanUndo(filter ColorFilter) bool {
+	if _, ok := filter.(*colorizeFilter); ok {
+		return true
+	}
+
+	return false
+}
+
+func (f *colorizeFilter) Undo(filter ColorFilter) {
+	filt := filter.(*colorizeFilter)
+
+	f.h = gm32.Clamp(f.h-filt.h, 0, 360)
+	f.s = gm32.Clamp(f.s-filt.s, 0, 100)
+	f.l = gm32.Clamp(f.l-filt.l, -100, 100)
+}
+
+func (f *colorizeFilter) Skip() bool {
+	return false
+}
+
+func (f *colorizeFilter) Copy() ColorFilter {
+	return &colorizeFilter{
+		h: f.h,
+		s: f.s,
+		l: f.l,
+	}
+}
+
+func (f *colorizeFilter) Prepare() {
+	f.h = gm32.Clamp(f.h, 0, 360)
+	f.s = gm32.Clamp(f.s, 0, 100)
+	f.l = gm32.Clamp(f.l, -100, 100)
+}
+
+// https://github.com/GNOME/gimp/blob/708f075f804caa5cbd11cae2f85f3726456aedcb/app/operations/gimpoperationcolorize.c#L222
+func (f *colorizeFilter) Fn(pix pixel) pixel {
+	h := f.h / 360
+	s := f.s / 100
+	l := f.l / 100
+
+	lum := gcu.RGBLuminance(pix.r, pix.g, pix.b)
+
+	switch {
+	case l > 0:
+		lum = lum * (1 - l)
+		lum += l
+	case l < 0:
+		lum = lum * (l + 1)
+	}
+
+	r, g, b := gcu.HSLToRGB(h, s, lum)
+	return pixel{r, g, b, pix.a}
+}
+
+// Colorizes an image.
+// The hue parameter must be in the range [0, 360].
+// The saturation parameter must be in the range [0, 100].
+// The lightness parameter must be in the range [-100, 100].
+func Colorize(h, s, l float32) ColorFilter {
+	return &colorizeFilter{
+		h: h,
+		s: s,
+		l: l,
+	}
+}
+
+var (
+	// Grayscales an image.
+	Grayscale ColorFilter = ColorFilterFunc(grayscale)
+)
+
+func grayscale(pix pixel) pixel {
+	v := 0.299*pix.r + 0.587*pix.g + 0.114*pix.b
+	return pixel{v, v, v, pix.a}
 }

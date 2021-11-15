@@ -1,4 +1,6 @@
+// Go (Image) Filtering Toolkit.
 // It is basically non-direct fork of GIFT (https://github.com/disintegration/gift).
+// Also some filters are taken from GIMP (https://github.com/GNOME/gimp).
 package gft
 
 import (
@@ -41,15 +43,21 @@ type List struct {
 }
 
 func MakeList(filters ...Filter) List {
-	return List{
-		filters: filters,
+	l := List{}
+	for _, filt := range filters {
+		l.Add(filt)
 	}
+
+	return l
 }
 
 func NewList(filters ...Filter) *List {
-	return &List{
-		filters: filters,
+	l := &List{}
+	for _, filt := range filters {
+		l.Add(filt)
 	}
+
+	return l
 }
 
 func (l *List) Clear() {
@@ -65,10 +73,6 @@ func (l *List) Add(filt Filter) {
 		last := l.filters[len(l.filters)-1]
 		if reflect.TypeOf(last) == reflect.TypeOf(filt) {
 			if last.Merge(filt) {
-				if last.Skip() {
-					l.filters = l.filters[:len(l.filters)-1]
-				}
-
 				return
 			}
 		}
@@ -95,6 +99,10 @@ func (l *List) Undo(filt Filter) {
 func (l *List) Bounds(src image.Rectangle) image.Rectangle {
 	dst := src
 	for _, filt := range l.filters {
+		if filt.Skip() {
+			continue
+		}
+
 		dst = filt.Bounds(dst)
 	}
 	return dst
@@ -106,22 +114,41 @@ func (l *List) Apply(dst draw.Image, src image.Image, parallel bool) {
 		return
 	}
 
+	first, last := 0, len(l.filters)-1
 	var tmpDst draw.Image
 	var tmpSrc image.Image
 
 	for i, filt := range l.filters {
-		if i == 0 {
+		if filt.Skip() {
+			if i == first {
+				first++
+			}
+
+			continue
+		}
+
+		if i == first {
 			tmpSrc = src
 		} else {
 			tmpSrc = tmpDst
 		}
 
-		if i == len(l.filters)-1 {
+		if i == last {
 			tmpDst = dst
 		} else {
 			tmpDst = image.NewRGBA(filt.Bounds(tmpSrc.Bounds()))
 		}
 
 		filt.Apply(tmpDst, tmpSrc, parallel)
+	}
+
+	if tmpDst != dst {
+		if tmpSrc == nil {
+			tmpSrc = src
+		} else {
+			tmpSrc = tmpDst
+		}
+
+		draw.Draw(dst, dst.Bounds(), tmpSrc, tmpSrc.Bounds().Min, draw.Over)
 	}
 }

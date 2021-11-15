@@ -14,6 +14,16 @@ const (
 	q16  = 1.0 / 6.0
 )
 
+func RGBLuminance(r, g, b float32) float32 {
+	const (
+		lr = 0.22248840
+		lg = 0.71690369
+		lb = 0.06060791
+	)
+
+	return r*lr + g*lg + b*lb
+}
+
 func RGBToHSL(r, g, b float32) (h, s, l float32) {
 	min := gm32.Min(r, gm32.Min(g, b))
 	max := gm32.Max(r, gm32.Max(g, b))

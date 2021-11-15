@@ -414,7 +414,7 @@ func (f *gammaFilter) UseLut() bool {
 // The gamma parameter must be positive. Gamma = 1 gives the original image.
 // Gamma less than 1 darkens the image and gamma greater than 1 lightens it.
 func Gamma(gamma float32) ColorchanFilter {
-	if gamma == 0 {
+	if gamma == 1 {
 		return nil
 	}
 

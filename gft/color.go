@@ -485,14 +485,14 @@ func HSL(h, s, l float32) ColorFilter {
 type ColorLevels struct {
 	CyanRed      float32
 	MagentaGreen float32
-	YellloBlue   float32
+	YelloBlue    float32
 }
 
 func (cl1 ColorLevels) Add(cl2 ColorLevels) ColorLevels {
 	return ColorLevels{
 		CyanRed:      gm32.Clamp(cl1.CyanRed+cl2.CyanRed, -100, 100),
 		MagentaGreen: gm32.Clamp(cl1.MagentaGreen+cl2.MagentaGreen, -100, 100),
-		YellloBlue:   gm32.Clamp(cl1.YellloBlue+cl2.YellloBlue, -100, 100),
+		YelloBlue:    gm32.Clamp(cl1.YelloBlue+cl2.YelloBlue, -100, 100),
 	}
 }
 
@@ -500,7 +500,7 @@ func (cl1 ColorLevels) Sub(cl2 ColorLevels) ColorLevels {
 	return ColorLevels{
 		CyanRed:      gm32.Clamp(cl1.CyanRed-cl2.CyanRed, -100, 100),
 		MagentaGreen: gm32.Clamp(cl1.MagentaGreen-cl2.MagentaGreen, -100, 100),
-		YellloBlue:   gm32.Clamp(cl1.YellloBlue-cl2.YellloBlue, -100, 100),
+		YelloBlue:    gm32.Clamp(cl1.YelloBlue-cl2.YelloBlue, -100, 100),
 	}
 }
 
@@ -508,12 +508,12 @@ func (cl ColorLevels) Clamp() ColorLevels {
 	return ColorLevels{
 		CyanRed:      gm32.Clamp(cl.CyanRed, -100, 100),
 		MagentaGreen: gm32.Clamp(cl.MagentaGreen, -100, 100),
-		YellloBlue:   gm32.Clamp(cl.YellloBlue, -100, 100),
+		YelloBlue:    gm32.Clamp(cl.YelloBlue, -100, 100),
 	}
 }
 
 func (cl ColorLevels) IsZero() bool {
-	return cl.CyanRed == 0 && cl.MagentaGreen == 0 && cl.YellloBlue == 0
+	return cl.CyanRed == 0 && cl.MagentaGreen == 0 && cl.YelloBlue == 0
 }
 
 type colorBalanceFilter struct {
@@ -603,7 +603,7 @@ func (f *colorBalanceFilter) Fn(pix pixel) pixel {
 
 	rn := f.mask(pix.r, l, f.shadows.CyanRed, f.midtones.CyanRed, f.highlights.CyanRed)
 	gn := f.mask(pix.g, l, f.shadows.MagentaGreen, f.midtones.MagentaGreen, f.highlights.MagentaGreen)
-	bn := f.mask(pix.b, l, f.shadows.YellloBlue, f.midtones.YellloBlue, f.highlights.YellloBlue)
+	bn := f.mask(pix.b, l, f.shadows.YelloBlue, f.midtones.YelloBlue, f.highlights.YelloBlue)
 
 	if f.preserveLuminosity {
 		h2, s2, _ := gcu.RGBToHSL(rn, gn, bn)

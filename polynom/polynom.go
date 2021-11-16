@@ -248,8 +248,8 @@ func (p1 *Polynomial) Mul(p2 *Polynomial) *Polynomial {
 
 	for it1 := p1.monoms.Front(); it1 != nil; it1 = it1.Next() {
 		m1 := it1.Value.(Monomial)
-		for it2 := p1.monoms.Front(); it2 != nil; it2 = it2.Next() {
-			m2 := it1.Value.(Monomial)
+		for it2 := p2.monoms.Front(); it2 != nil; it2 = it2.Next() {
+			m2 := it2.Value.(Monomial)
 			o.addMonom(Monomial{
 				Coef:   m1.Coef * m2.Coef,
 				Degree: m1.Degree + m2.Degree,

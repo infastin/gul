@@ -53,6 +53,11 @@ func (s *Stack) Pop() *Element {
 	return ret
 }
 
+func (s *Stack) Clear() {
+	s.len = 0
+	s.top = nil
+}
+
 func (s *Stack) Empty() bool {
 	return s.len == 0
 }

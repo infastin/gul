@@ -56,6 +56,12 @@ func (q *Queue) Pop() *Element {
 	return ret
 }
 
+func (q *Queue) Clear() {
+	q.len = 0
+	q.front = nil
+	q.back = nil
+}
+
 func (q *Queue) Empty() bool {
 	return q.len == 0
 }

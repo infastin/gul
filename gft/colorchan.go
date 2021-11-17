@@ -9,16 +9,39 @@ import (
 	"github.com/infastin/gul/tools"
 )
 
+// This is the filter used for combining by using CombineColorhanFilters.
+// Must be a pointer.
 type ColorchanFilter interface {
+	// Returns changed color channel.
 	Fn(x float32) float32
+
+	// Prepares the filter before calling Fn multiple times.
 	Prepare()
+
+	// Returns true, if it is possible to create a lookup table usign Fn.
+	// Otherwise, returns false.
 	UseLut() bool
-	Merge(filter ColorchanFilter)
-	Undo(filter ColorchanFilter)
-	Skip() bool
-	Copy() ColorchanFilter
+
+	// Returns true, if it is possible to combine two filters.
+	// Otherwise, returns false.
 	CanMerge(filter ColorchanFilter) bool
+
+	// Returns true, if it is possible to decombine two filters.
+	// Otherwise, returns false.
 	CanUndo(filter ColorchanFilter) bool
+
+	// Combines two filters, if CanMerge has returned true.
+	Merge(filter ColorchanFilter)
+
+	// Decombines two filters, if CanUndo has returned true.
+	Undo(filter ColorchanFilter)
+
+	// Returns true, if nothing will change after applying the filter.
+	// Otherwise, returns false.
+	Skip() bool
+
+	// Returns a copy of the filter.
+	Copy() ColorchanFilter
 }
 
 type combineColorchanFilter struct {

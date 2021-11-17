@@ -9,15 +9,37 @@ import (
 	"github.com/infastin/gul/tools"
 )
 
+// This is the filter used for combining by using CombineColorFilters.
+// Must be a pointer.
 type ColorFilter interface {
+	// Returns changed color.
 	Fn(pix pixel) pixel
+
+	// Prepares the filter before calling Fn multiple times.
 	Prepare()
-	Merge(filter ColorFilter)
-	Undo(filter ColorFilter)
-	Skip() bool
-	Copy() ColorFilter
+
+	// Returns true, if it is possible to combine two filters.
+	// Otherwise, returns false.
 	CanMerge(filter ColorFilter) bool
+
+	// Returns true, if it is possible to decombine two filters.
+	// Otherwise, returns false.
 	CanUndo(filter ColorFilter) bool
+
+	// If CanMerge has returned true,
+	// combines two filters and writes the result to an instance of interface and returns true.
+	Merge(filter ColorFilter)
+
+	// If CanUndo has returned true,
+	// decombines two filters and writes the result to an instance of interface and returns true.
+	Undo(filter ColorFilter)
+
+	// Returns true, if nothing will change after applying the filter.
+	// Otherwise, returns false.
+	Skip() bool
+
+	// Returns a copy of the filter.
+	Copy() ColorFilter
 }
 
 type combineColorFilter struct {

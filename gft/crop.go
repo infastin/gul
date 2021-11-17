@@ -9,8 +9,8 @@ import (
 )
 
 type cropRectangleFilter struct {
-	pos  Position
-	size Size
+	startX, startY float32
+	width, height  float32
 }
 
 func (f *cropRectangleFilter) Bounds(src image.Rectangle) image.Rectangle {
@@ -18,8 +18,8 @@ func (f *cropRectangleFilter) Bounds(src image.Rectangle) image.Rectangle {
 	srcWidth := float32(srcb.Dx())
 	srcHeight := float32(srcb.Dy())
 
-	dstWidth := int(gm32.Round(srcWidth * f.size.Width))
-	dstHeight := int(gm32.Round(srcHeight * f.size.Height))
+	dstWidth := int(gm32.Round(srcWidth * f.width))
+	dstHeight := int(gm32.Round(srcHeight * f.height))
 
 	return image.Rect(0, 0, dstWidth, dstHeight)
 }
@@ -30,8 +30,8 @@ func (f *cropRectangleFilter) Apply(dst draw.Image, src image.Image, parallel bo
 	srcHeight := srcb.Dy()
 
 	dstb := dst.Bounds()
-	startX := int(gm32.Round(float32(srcWidth) * f.pos.X))
-	startY := int(gm32.Round(float32(srcHeight) * f.pos.Y))
+	startX := int(gm32.Round(float32(srcWidth) * f.startX))
+	startY := int(gm32.Round(float32(srcHeight) * f.startY))
 
 	draw.Draw(dst, dstb, src, image.Pt(startX, startY), draw.Over)
 }
@@ -42,11 +42,11 @@ func (f *cropRectangleFilter) Merge(filter Filter) bool {
 		return false
 	}
 
-	f.pos.X += filt.pos.X * f.size.Width
-	f.pos.Y += filt.pos.Y * f.size.Height
+	f.startX += filt.startX * f.width
+	f.startY += filt.startY * f.height
 
-	f.size.Width *= filt.size.Width
-	f.size.Height *= filt.size.Height
+	f.width *= filt.width
+	f.height *= filt.height
 
 	return true
 }
@@ -57,43 +57,47 @@ func (f *cropRectangleFilter) Undo(filter Filter) bool {
 		return false
 	}
 
-	f.size.Height /= filt.size.Height
-	f.size.Width /= filt.size.Width
+	f.height /= filt.height
+	f.width /= filt.width
 
-	f.pos.X -= filt.pos.X * f.size.Width
-	f.pos.Y -= filt.pos.Y * f.size.Height
+	f.startX -= filt.startX * f.width
+	f.startY -= filt.startY * f.height
 
 	return false
 }
 
 func (f *cropRectangleFilter) Skip() bool {
-	return f.pos.X == 0 && f.pos.Y == 0 && f.size.Height == 1 && f.size.Width == 1
+	return f.startX == 0 && f.startY == 0 && f.height == 1 && f.width == 1
 }
 
 func (f *cropRectangleFilter) Copy() Filter {
 	return &cropRectangleFilter{
-		pos:  f.pos,
-		size: f.size,
+		startX: f.startX,
+		startY: f.startY,
+		width:  f.width,
+		height: f.height,
 	}
 }
 
-// Crops an image starting at a given position with a rectangle of a given size.
+// Crops an image starting at a given position (startX, startY) with a rectangle of a given size (width, height).
 // The position and size parameters should be in the range [0, 1].
 // Example: You have an image and you want to crop the bottom-right quarter of it.
 // Then pos will be (0.5, 0.5) and size will be (0.5, 0.5).
-func CropRectangle(pos Position, size Size) Filter {
-	if pos.X == 0 && pos.Y == 0 && size.Height == 1 && size.Width == 1 {
+func CropRectangle(startX, startY, width, height float32) Filter {
+	if startX == 0 && startY == 0 && height == 1 && width == 1 {
 		return nil
 	}
 
 	return &cropRectangleFilter{
-		pos:  pos,
-		size: size,
+		startX: startX,
+		startY: startY,
+		width:  width,
+		height: height,
 	}
 }
 
 type cropEllipseFilter struct {
-	center Position
+	cx, cy float32
 	rx, ry float32
 }
 
@@ -102,11 +106,11 @@ func (f *cropEllipseFilter) Bounds(src image.Rectangle) image.Rectangle {
 	srcWidth := float32(srcb.Dx())
 	srcHeight := float32(srcb.Dy())
 
-	leftX := gm32.Min(f.rx, f.center.X)
-	rightX := gm32.Min(f.rx, 1-f.center.X)
+	leftX := gm32.Min(f.rx, f.cx)
+	rightX := gm32.Min(f.rx, 1-f.cx)
 
-	topY := gm32.Min(f.ry, f.center.Y)
-	botY := gm32.Min(f.ry, 1-f.center.Y)
+	topY := gm32.Min(f.ry, f.cy)
+	botY := gm32.Min(f.ry, 1-f.cy)
 
 	dstWidth := int(gm32.Round(srcWidth * (leftX + rightX)))
 	dstHeight := int(gm32.Round(srcHeight * (topY + botY)))
@@ -131,11 +135,11 @@ func (f *cropEllipseFilter) Apply(dst draw.Image, src image.Image, parallel bool
 	srcWidth := float32(srcb.Dx())
 	srcHeight := float32(srcb.Dy())
 
-	leftX := gm32.Min(f.rx, f.center.X)
-	topY := gm32.Min(f.ry, f.center.Y)
+	leftX := gm32.Min(f.rx, f.cx)
+	topY := gm32.Min(f.ry, f.cy)
 
-	startX := f.center.X - leftX
-	startY := f.center.Y - topY
+	startX := f.cx - leftX
+	startY := f.cy - topY
 
 	offset := image.Point{
 		X: int(gm32.Round(startX * srcWidth)),
@@ -146,8 +150,8 @@ func (f *cropEllipseFilter) Apply(dst draw.Image, src image.Image, parallel bool
 	dstWidth := dstb.Dx()
 	dstHeight := dstb.Dy()
 
-	cx := float64(srcWidth * (f.center.X - startX))
-	cy := float64(srcHeight * (f.center.Y - startY))
+	cx := float64(srcWidth * (f.cx - startX))
+	cy := float64(srcHeight * (f.cy - startY))
 	rx := float64(srcWidth * f.rx)
 	ry := float64(srcHeight * f.ry)
 
@@ -162,24 +166,26 @@ func (f *cropEllipseFilter) Apply(dst draw.Image, src image.Image, parallel bool
 
 func (f *cropEllipseFilter) Copy() Filter {
 	return &cropEllipseFilter{
-		center: f.center,
-		rx:     f.rx,
-		ry:     f.ry,
+		cx: f.cx,
+		cy: f.cy,
+		rx: f.rx,
+		ry: f.ry,
 	}
 }
 
-// Crops an image starting at a given position with an ellipse of the a radii.
+// Crops an image with an ellipse of a radii (rx, ry) with the center at a given position (cx, cy).
 // The position and radii parameters should be in the range [0, 1].
-func CropEllipse(center Position, rx, ry float32) Filter {
-	center.X = gm32.Clamp(center.X, 0, 1)
-	center.Y = gm32.Clamp(center.Y, 0, 1)
+func CropEllipse(cx, cy, rx, ry float32) Filter {
+	cx = gm32.Clamp(cx, 0, 1)
+	cy = gm32.Clamp(cy, 0, 1)
 
 	rx = gm32.Clamp(rx, 0, 1)
 	ry = gm32.Clamp(ry, 0, 1)
 
 	return &cropEllipseFilter{
-		center: center,
-		rx:     rx,
-		ry:     ry,
+		cx: cx,
+		cy: cy,
+		rx: rx,
+		ry: ry,
 	}
 }

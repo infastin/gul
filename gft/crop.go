@@ -88,6 +88,20 @@ func CropRectangle(startX, startY, width, height float32) Filter {
 		return nil
 	}
 
+	startX = gm32.Clamp(startX, 0, 1)
+	startY = gm32.Clamp(startY, 0, 1)
+
+	width = gm32.Clamp(width, 0, 1)
+	height = gm32.Clamp(height, 0, 1)
+
+	if startX+width > 1 {
+		width = 1 - startX
+	}
+
+	if startY+height > 1 {
+		height = 1 - startY
+	}
+
 	return &cropRectangleFilter{
 		startX: startX,
 		startY: startY,

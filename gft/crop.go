@@ -80,7 +80,7 @@ func (f *cropRectangleFilter) Copy() Filter {
 }
 
 // Crops an image starting at a given position (startX, startY) with a rectangle of a given size (width, height).
-// The position and size parameters should be in the range [0, 1].
+// The position and size parameters must be in the range [0, 1].
 // Example: You have an image and you want to crop the bottom-right quarter of it.
 // Then pos will be (0.5, 0.5) and size will be (0.5, 0.5).
 func CropRectangle(startX, startY, width, height float32) Filter {
@@ -188,7 +188,7 @@ func (f *cropEllipseFilter) Copy() Filter {
 }
 
 // Crops an image with an ellipse of a radii (rx, ry) with the center at a given position (cx, cy).
-// The position and radii parameters should be in the range [0, 1].
+// The position and radii parameters must be in the range [0, 1].
 func CropEllipse(cx, cy, rx, ry float32) Filter {
 	cx = gm32.Clamp(cx, 0, 1)
 	cy = gm32.Clamp(cy, 0, 1)

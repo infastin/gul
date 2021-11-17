@@ -37,16 +37,16 @@ var (
 	TransposeTransformer Transformer = &transposeTransformer{}
 
 	// Changes each (x, y) pixel to (y, x) pixel and rotates
-	// and image by 180 degrees.
+	// an image by 180 degrees.
 	TransverseTransformer Transformer = &transverseTransformer{}
 
-	// Rotates and image by 90 degrees.
+	// Rotates an image by 90 degrees.
 	Rotate90Transformer Transformer = &rotate90Transformer{}
 
-	// Rotates and image by 180 degrees.
+	// Rotates an image by 180 degrees.
 	Rotate180Transformer Transformer = &rotate180Transformer{}
 
-	// Rotates and image by 270 degrees.
+	// Rotates an image by 270 degrees.
 	Rotate270Transformer Transformer = &rotate270Transformer{}
 )
 

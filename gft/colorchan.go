@@ -9,7 +9,7 @@ import (
 	"github.com/infastin/gul/tools"
 )
 
-// This is the filter used for combining by using CombineColorhanFilters.
+// This is a filter used for combining by using CombineColorhanFilters.
 // Must be a pointer.
 type ColorchanFilter interface {
 	// Returns changed color channel.

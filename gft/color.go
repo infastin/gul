@@ -9,7 +9,7 @@ import (
 	"github.com/infastin/gul/tools"
 )
 
-// This is the filter used for combining by using CombineColorFilters.
+// This is a filter used for combining by using CombineColorFilters.
 // Must be a pointer.
 type ColorFilter interface {
 	// Returns changed color.

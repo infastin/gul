@@ -83,7 +83,7 @@ func (f *cropRectangleFilter) Copy() Filter {
 // The position and size parameters must be in the range [0, 1].
 // Example: You have an image and you want to crop the bottom-right quarter of it.
 // Then pos will be (0.5, 0.5) and size will be (0.5, 0.5).
-func CropRectangle(startX, startY, width, height float32) Filter {
+func CropRectangle(startX, startY, width, height float32) MergingFilter {
 	if startX == 0 && startY == 0 && height == 1 && width == 1 {
 		return nil
 	}
@@ -132,18 +132,6 @@ func (f *cropEllipseFilter) Bounds(src image.Rectangle) image.Rectangle {
 	return image.Rect(0, 0, dstWidth, dstHeight)
 }
 
-func (f *cropEllipseFilter) Merge(Filter) bool {
-	return false
-}
-
-func (f *cropEllipseFilter) Undo(Filter) bool {
-	return false
-}
-
-func (f *cropEllipseFilter) Skip() bool {
-	return false
-}
-
 func (f *cropEllipseFilter) Apply(dst draw.Image, src image.Image, parallel bool) {
 	srcb := src.Bounds()
 	srcWidth := float32(srcb.Dx())
@@ -178,18 +166,15 @@ func (f *cropEllipseFilter) Apply(dst draw.Image, src image.Image, parallel bool
 	filler.Draw()
 }
 
-func (f *cropEllipseFilter) Copy() Filter {
-	return &cropEllipseFilter{
-		cx: f.cx,
-		cy: f.cy,
-		rx: f.rx,
-		ry: f.ry,
-	}
-}
-
 // Crops an image with an ellipse of a radii (rx, ry) with the center at a given position (cx, cy).
 // The position and radii parameters must be in the range [0, 1].
 func CropEllipse(cx, cy, rx, ry float32) Filter {
+	maxRad := gm32.Sqrt(cx*cx + cy*cy)
+	maxRad = gm32.RoundN(maxRad, 2)
+	if rx >= maxRad && ry >= maxRad {
+		return nil
+	}
+
 	cx = gm32.Clamp(cx, 0, 1)
 	cy = gm32.Clamp(cy, 0, 1)
 

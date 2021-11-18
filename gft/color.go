@@ -14,6 +14,11 @@ import (
 type ColorFilter interface {
 	// Returns changed color.
 	Fn(pix pixel) pixel
+}
+
+// This color filter can merge other color filters into itself.
+type MergingColorFilter interface {
+	ColorFilter
 
 	// Prepares the filter before calling Fn multiple times.
 	Prepare()
@@ -62,7 +67,11 @@ func (f *combineColorFilter) Merge(filter Filter) bool {
 			continue
 		}
 
-		if !f.filters[i].CanMerge(filt.filters[i]) {
+		if fi, ok := f.filters[i].(MergingColorFilter); ok {
+			if fi.CanMerge(filt.filters[i]) {
+				return false
+			}
+		} else {
 			return false
 		}
 	}
@@ -77,7 +86,8 @@ func (f *combineColorFilter) Merge(filter Filter) bool {
 			continue
 		}
 
-		f.filters[i].Merge(filt.filters[i])
+		fi := f.filters[i].(MergingColorFilter)
+		fi.Merge(filt.filters[i])
 	}
 
 	f.mergeCount++
@@ -100,7 +110,15 @@ func (f *combineColorFilter) Undo(filter Filter) bool {
 			continue
 		}
 
-		if f.filters[i] == nil || !f.filters[i].CanUndo(filt.filters[i]) {
+		if f.filters[i] == nil {
+			return false
+		}
+
+		if fi, ok := f.filters[i].(MergingColorFilter); ok {
+			if !fi.CanUndo(filt.filters[i]) {
+				return false
+			}
+		} else {
 			return false
 		}
 	}
@@ -110,7 +128,8 @@ func (f *combineColorFilter) Undo(filter Filter) bool {
 			continue
 		}
 
-		f.filters[i].Undo(filt.filters[i])
+		fi := f.filters[i].(MergingColorFilter)
+		fi.Undo(filt.filters[i])
 	}
 
 	f.mergeCount--
@@ -124,7 +143,11 @@ func (f *combineColorFilter) Skip() bool {
 			continue
 		}
 
-		if !filt.Skip() {
+		if filt, ok := filt.(MergingColorFilter); ok {
+			if !filt.Skip() {
+				return false
+			}
+		} else {
 			return false
 		}
 	}
@@ -144,7 +167,11 @@ func (f *combineColorFilter) Copy() Filter {
 			continue
 		}
 
-		r.filters[i] = f.filters[i].Copy()
+		if fi, ok := f.filters[i].(MergingColorFilter); ok {
+			r.filters[i] = fi.Copy()
+		} else {
+			r.filters[i] = f.filters[i]
+		}
 	}
 
 	return r
@@ -166,7 +193,9 @@ func (f *combineColorFilter) Apply(dst draw.Image, src image.Image, parallel boo
 			continue
 		}
 
-		filt.Prepare()
+		if filt, ok := filt.(MergingColorFilter); ok {
+			filt.Prepare()
+		}
 	}
 
 	procs := 1
@@ -194,7 +223,7 @@ func (f *combineColorFilter) Apply(dst draw.Image, src image.Image, parallel boo
 }
 
 // Creates combination of color filters and returns filter.
-func CombineColorFilters(filters ...ColorFilter) Filter {
+func CombineColorFilters(filters ...ColorFilter) MergingFilter {
 	if len(filters) == 0 {
 		return nil
 	}
@@ -219,30 +248,6 @@ func CombineColorFilters(filters ...ColorFilter) Filter {
 type colorFilterFunc struct {
 	fn func(pix pixel) pixel
 }
-
-func (f *colorFilterFunc) CanMerge(ColorFilter) bool {
-	return false
-}
-
-func (f *colorFilterFunc) Merge(ColorFilter) {}
-
-func (f *colorFilterFunc) CanUndo(ColorFilter) bool {
-	return false
-}
-
-func (f *colorFilterFunc) Undo(ColorFilter) {}
-
-func (f *colorFilterFunc) Skip() bool {
-	return false
-}
-
-func (f *colorFilterFunc) Copy() ColorFilter {
-	return &colorFilterFunc{
-		fn: f.fn,
-	}
-}
-
-func (f *colorFilterFunc) Prepare() {}
 
 func (f *colorFilterFunc) Fn(pix pixel) pixel {
 	return f.fn(pix)
@@ -324,7 +329,7 @@ func (f *sepiaFilter) Copy() ColorFilter {
 // The percentage parameter specifies how much the image should be adjusted.
 // It must be in the range [0, 100].
 // It can be any value for merging purposes.
-func Sepia(perc float32) ColorFilter {
+func Sepia(perc float32) MergingColorFilter {
 	if perc == 0 {
 		return nil
 	}
@@ -407,7 +412,7 @@ func (f *hsbFilter) Fn(pix pixel) pixel {
 // The hue parameter must be in the range [-360, 360].
 // The saturation and brightness parameters must be in the range [-100, 100].
 // Each parameter can have any value for merging purposes.
-func HSB(h, s, b float32) ColorFilter {
+func HSB(h, s, b float32) MergingColorFilter {
 	if h == 0 && s == 0 && b == 0 {
 		return nil
 	}
@@ -492,7 +497,7 @@ func (f *hslFilter) Fn(pix pixel) pixel {
 // The hue parameter must be in the range [-360, 360].
 // The saturation and lightness parameters must be in the range [-100, 100].
 // Each parameter can have any value for merging purposes.
-func HSL(h, s, l float32) ColorFilter {
+func HSL(h, s, l float32) MergingColorFilter {
 	if h == 0 && s == 0 && l == 0 {
 		return nil
 	}
@@ -638,7 +643,7 @@ func (f *colorBalanceFilter) Fn(pix pixel) pixel {
 // Adjusts color distribution in an image.
 // Each color level  must be in the range [-100, 100].
 // The color levels can have any value for merging purposes.
-func ColorBalance(shadows, midtones, highlights ColorLevels, preserveLuminosity bool) ColorFilter {
+func ColorBalance(shadows, midtones, highlights ColorLevels, preserveLuminosity bool) MergingColorFilter {
 	if shadows.IsZero() && midtones.IsZero() && highlights.IsZero() {
 		return nil
 	}
@@ -729,7 +734,7 @@ func (f *colorizeFilter) Fn(pix pixel) pixel {
 // The hue parameter must be in the range [0, 360].
 // The saturation parameter must be in the range [0, 100].
 // The lightness parameter must be in the range [-100, 100].
-func Colorize(h, s, l float32) ColorFilter {
+func Colorize(h, s, l float32) MergingColorFilter {
 	return &colorizeFilter{
 		h: h,
 		s: s,

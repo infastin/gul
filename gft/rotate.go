@@ -18,9 +18,10 @@ const (
 )
 
 type rotateFilter struct {
-	rad           float32
-	interpolation Interpolation
-	mergeCount    uint
+	rad              float32
+	interpolation    Interpolation
+	oldInterpolation Interpolation
+	mergeCount       uint
 }
 
 func (f *rotateFilter) Bounds(src image.Rectangle) image.Rectangle {
@@ -111,18 +112,25 @@ func (f *rotateFilter) Apply(dst draw.Image, src image.Image, parallel bool) {
 }
 
 func (f *rotateFilter) Merge(filter Filter) bool {
-	filt, ok := filter.(*rotateFilter)
-	if !ok {
+	switch filt := filter.(type) {
+	case *rotateFilter:
+		f.rad = gm32.Mod(f.rad+filt.rad, 2*math.Pi)
+		filt.oldInterpolation = f.interpolation
+		f.interpolation = filt.interpolation
+	case *transformFilter:
+		switch filt.transformer {
+		case Rotate90Transformer:
+			f.rad = gm32.Mod(f.rad+math.Pi/2, 2*math.Pi)
+		case Rotate180Transformer:
+			f.rad = gm32.Mod(f.rad+math.Pi, 2*math.Pi)
+		case Rotate270Transformer:
+			f.rad = gm32.Mod(f.rad+3*math.Pi/2, 2*math.Pi)
+		}
+	default:
 		return false
 	}
 
-	if f.interpolation != filt.interpolation {
-		return false
-	}
-
-	f.rad = gm32.Mod(f.rad+filt.rad, 2*math.Pi)
 	f.mergeCount++
-
 	return true
 }
 
@@ -131,32 +139,39 @@ func (f *rotateFilter) Skip() bool {
 }
 
 func (f *rotateFilter) Undo(filter Filter) bool {
-	filt, ok := filter.(*rotateFilter)
-	if !ok {
+	switch filt := filter.(type) {
+	case *rotateFilter:
+		f.rad = gm32.Mod(f.rad-filt.rad, 2*math.Pi)
+		f.interpolation = filt.oldInterpolation
+	case *transformFilter:
+		switch filt.transformer {
+		case Rotate90Transformer:
+			f.rad = gm32.Mod(f.rad-math.Pi/2, 2*math.Pi)
+		case Rotate180Transformer:
+			f.rad = gm32.Mod(f.rad-math.Pi, 2*math.Pi)
+		case Rotate270Transformer:
+			f.rad = gm32.Mod(f.rad-3*math.Pi/2, 2*math.Pi)
+		}
+	default:
 		return false
 	}
 
-	if f.interpolation != filt.interpolation {
-		return false
-	}
-
-	f.rad = gm32.Mod(f.rad-filt.rad, 2*math.Pi)
 	f.mergeCount--
-
 	return f.mergeCount == 0
 }
 
 func (f *rotateFilter) Copy() Filter {
 	return &rotateFilter{
-		rad:           f.rad,
-		interpolation: f.interpolation,
-		mergeCount:    f.mergeCount,
+		rad:              f.rad,
+		interpolation:    f.interpolation,
+		oldInterpolation: f.oldInterpolation,
+		mergeCount:       f.mergeCount,
 	}
 }
 
 // Rotates the image using given interpolation method.
 // The angle is given in radians.
-func Rotate(rad float32, interpolation Interpolation) Filter {
+func Rotate(rad float32, interpolation Interpolation) MergingFilter {
 	if gm32.Mod(rad, 2*math.Pi) == 0 {
 		return nil
 	}

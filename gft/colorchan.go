@@ -15,12 +15,17 @@ type ColorchanFilter interface {
 	// Returns changed color channel.
 	Fn(x float32) float32
 
-	// Prepares the filter before calling Fn multiple times.
-	Prepare()
-
 	// Returns true, if it is possible to create a lookup table usign Fn.
 	// Otherwise, returns false.
 	UseLut() bool
+}
+
+// This colorhan filter can merge other colorhan filters into itself.
+type MergingColorchanFilter interface {
+	ColorchanFilter
+
+	// Prepares the filter before calling Fn multiple times.
+	Prepare()
 
 	// Returns true, if it is possible to combine two filters.
 	// Otherwise, returns false.
@@ -65,7 +70,11 @@ func (f *combineColorchanFilter) Merge(filter Filter) bool {
 			continue
 		}
 
-		if !f.filters[i].CanMerge(filt.filters[i]) {
+		if fi, ok := f.filters[i].(MergingColorchanFilter); ok {
+			if fi.CanMerge(filt.filters[i]) {
+				return false
+			}
+		} else {
 			return false
 		}
 	}
@@ -80,7 +89,8 @@ func (f *combineColorchanFilter) Merge(filter Filter) bool {
 			continue
 		}
 
-		f.filters[i].Merge(filt.filters[i])
+		fi := f.filters[i].(MergingColorchanFilter)
+		fi.Merge(filt.filters[i])
 	}
 
 	f.mergeCount++
@@ -103,7 +113,15 @@ func (f *combineColorchanFilter) Undo(filter Filter) bool {
 			continue
 		}
 
-		if f.filters[i] == nil || !f.filters[i].CanUndo(filt.filters[i]) {
+		if f.filters[i] == nil {
+			return false
+		}
+
+		if fi, ok := f.filters[i].(MergingColorchanFilter); ok {
+			if !fi.CanUndo(filt.filters[i]) {
+				return false
+			}
+		} else {
 			return false
 		}
 	}
@@ -113,7 +131,8 @@ func (f *combineColorchanFilter) Undo(filter Filter) bool {
 			continue
 		}
 
-		f.filters[i].Undo(filt.filters[i])
+		fi := f.filters[i].(MergingColorchanFilter)
+		fi.Undo(filt.filters[i])
 	}
 
 	f.mergeCount--
@@ -127,7 +146,11 @@ func (f *combineColorchanFilter) Skip() bool {
 			continue
 		}
 
-		if !filt.Skip() {
+		if filt, ok := filt.(MergingColorchanFilter); ok {
+			if !filt.Skip() {
+				return false
+			}
+		} else {
 			return false
 		}
 	}
@@ -147,7 +170,11 @@ func (f *combineColorchanFilter) Copy() Filter {
 			continue
 		}
 
-		r.filters[i] = f.filters[i].Copy()
+		if fi, ok := f.filters[i].(MergingColorchanFilter); ok {
+			r.filters[i] = fi.Copy()
+		} else {
+			r.filters[i] = f.filters[i]
+		}
 	}
 
 	return r
@@ -196,7 +223,9 @@ func (f *combineColorchanFilter) Apply(dst draw.Image, src image.Image, parallel
 			continue
 		}
 
-		filt.Prepare()
+		if filt, ok := filt.(MergingColorchanFilter); ok {
+			filt.Prepare()
+		}
 
 		if filt.UseLut() {
 			lutSize := len(f.luts[i])
@@ -255,7 +284,7 @@ func (f *combineColorchanFilter) Apply(dst draw.Image, src image.Image, parallel
 }
 
 // Creates combination of colorchan filters and returns filter.
-func CombineColorchanFilters(filters ...ColorchanFilter) Filter {
+func CombineColorchanFilters(filters ...ColorchanFilter) MergingFilter {
 	if len(filters) == 0 {
 		return nil
 	}
@@ -283,34 +312,9 @@ type colorchanFilterFunc struct {
 	useLut bool
 }
 
-func (f *colorchanFilterFunc) CanMerge(ColorchanFilter) bool {
-	return false
-}
-
-func (f *colorchanFilterFunc) Merge(ColorchanFilter) {}
-
-func (f *colorchanFilterFunc) CanUndo(ColorchanFilter) bool {
-	return false
-}
-
-func (f *colorchanFilterFunc) Undo(ColorchanFilter) {}
-
-func (f *colorchanFilterFunc) Skip() bool {
-	return false
-}
-
-func (f *colorchanFilterFunc) Copy() ColorchanFilter {
-	return &colorchanFilterFunc{
-		fn:     f.fn,
-		useLut: f.useLut,
-	}
-}
-
 func (f *colorchanFilterFunc) UseLut() bool {
 	return f.useLut
 }
-
-func (f *colorchanFilterFunc) Prepare() {}
 
 func (f *colorchanFilterFunc) Fn(x float32) float32 {
 	return f.fn(x)
@@ -374,7 +378,7 @@ func (f *invertFilter) Fn(x float32) float32 {
 }
 
 // Negates the colors of an image.
-func Invert() ColorchanFilter {
+func Invert() MergingColorchanFilter {
 	return &invertFilter{
 		state: 1,
 	}
@@ -436,7 +440,7 @@ func (f *gammaFilter) UseLut() bool {
 // Gamma creates a filter that performs a gamma correction on an image.
 // The gamma parameter must be positive. Gamma = 1 gives the original image.
 // Gamma less than 1 darkens the image and gamma greater than 1 lightens it.
-func Gamma(gamma float32) ColorchanFilter {
+func Gamma(gamma float32) MergingColorchanFilter {
 	if gamma == 1 {
 		return nil
 	}
@@ -506,7 +510,7 @@ func (f *contrastFilter) UseLut() bool {
 // The percentage parameter must be in the range [-100, 100].
 // It can have any value for merging purposes.
 // The percentage = -100 gives solid gray image. The percentage = 100 gives an overcontrasted image.
-func Contrast(perc float32) ColorchanFilter {
+func Contrast(perc float32) MergingColorchanFilter {
 	if perc == 0 {
 		return nil
 	}
@@ -580,7 +584,7 @@ func (f *brightnessFilter) UseLut() bool {
 // The percentage parameter must be in the range [-100, 100].
 // It can have any value for merging purposes.
 // The percentage = -100 gives solid black image. The percentage = 100 gives solid white image.
-func Brightness(perc float32) ColorchanFilter {
+func Brightness(perc float32) MergingColorchanFilter {
 	if perc == 0 {
 		return nil
 	}

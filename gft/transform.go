@@ -98,7 +98,7 @@ func (f *transformFilter) Copy() Filter {
 }
 
 // Transform an image using given Transformer.
-func Transform(transformer Transformer) Filter {
+func Transform(transformer Transformer) MergingFilter {
 	return &transformFilter{
 		transformer: transformer,
 		mergeCount:  1,

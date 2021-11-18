@@ -6,7 +6,6 @@ package gft
 import (
 	"image"
 	"image/draw"
-	"reflect"
 )
 
 // Filter is an image filter.
@@ -17,20 +16,26 @@ type Filter interface {
 
 	// Applies the filter to the src image and draws the result to the dst image.
 	Apply(dst draw.Image, src image.Image, parallel bool)
+}
 
-	// If possible, combines two filters, writes the result to an instance of interface and returns true.
+// This filter can merge other filters into itself.
+type MergingFilter interface {
+	Filter
+
+	// If possible, merges one filter into an instance of interface and returns true.
 	// Otherwise, returns false.
 	Merge(filter Filter) bool
 
-	// Returns true, if nothing will change after applying the filter.
-	// Otherwise, returns false.
-	Skip() bool
-
-	// If possible, decombines tow filters and writes the result to an instance of interface.
+	// Operation opposite to Merge.
+	// If possible, demerges one filter from an instance of interface.
 	// If not, returns false.
 	// If got nothing after decombination, returns true.
 	// Otherwise, returns false.
 	Undo(filter Filter) bool
+
+	// Returns true, if nothing will change after applying the filter.
+	// Otherwise, returns false.
+	Skip() bool
 
 	// Returns a copy of the filter.
 	Copy() Filter
@@ -71,7 +76,8 @@ func (l *List) Empty() bool {
 func (l *List) Add(filt Filter) {
 	if len(l.filters) != 0 {
 		last := l.filters[len(l.filters)-1]
-		if reflect.TypeOf(last) == reflect.TypeOf(filt) {
+
+		if last, ok := last.(MergingFilter); ok {
 			if last.Merge(filt) {
 				return
 			}
@@ -87,11 +93,11 @@ func (l *List) Undo(filt Filter) {
 	}
 
 	last := l.filters[len(l.filters)-1]
-	if reflect.TypeOf(last) != reflect.TypeOf(filt) {
-		return
-	}
-
-	if last.Undo(filt) {
+	if last, ok := last.(MergingFilter); ok {
+		if last.Undo(filt) {
+			l.filters = l.filters[:len(l.filters)-1]
+		}
+	} else {
 		l.filters = l.filters[:len(l.filters)-1]
 	}
 }
@@ -99,8 +105,10 @@ func (l *List) Undo(filt Filter) {
 func (l *List) Bounds(src image.Rectangle) image.Rectangle {
 	dst := src
 	for _, filt := range l.filters {
-		if filt.Skip() {
-			continue
+		if filt, ok := filt.(MergingFilter); ok {
+			if filt.Skip() {
+				continue
+			}
 		}
 
 		dst = filt.Bounds(dst)
@@ -119,12 +127,14 @@ func (l *List) Apply(dst draw.Image, src image.Image, parallel bool) {
 	var tmpSrc image.Image
 
 	for i, filt := range l.filters {
-		if filt.Skip() {
-			if i == first {
-				first++
-			}
+		if filt, ok := filt.(MergingFilter); ok {
+			if filt.Skip() {
+				if i == first {
+					first++
+				}
 
-			continue
+				continue
+			}
 		}
 
 		if i == first {

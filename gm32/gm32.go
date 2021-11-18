@@ -30,6 +30,11 @@ func Sinc(x float32) float32 {
 	return float32(f)
 }
 
+func Sqrt(x float32) float32 {
+	sqrt := math.Sqrt(float64(x))
+	return float32(sqrt)
+}
+
 func Abs(x float32) float32 {
 	if x < 0 {
 		return -x

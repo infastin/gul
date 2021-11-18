@@ -18,9 +18,10 @@ const (
 )
 
 type rotateFilter struct {
-	rad           float32
-	interpolation Interpolation
-	mergeCount    uint
+	rad              float32
+	interpolation    Interpolation
+	oldInterpolation Interpolation
+	mergeCount       uint
 }
 
 func (f *rotateFilter) Bounds(src image.Rectangle) image.Rectangle {
@@ -114,10 +115,8 @@ func (f *rotateFilter) Merge(filter Filter) bool {
 	switch filt := filter.(type) {
 	case *rotateFilter:
 		f.rad = gm32.Mod(f.rad+filt.rad, 2*math.Pi)
-
-		tmp := f.interpolation
+		filt.oldInterpolation = f.interpolation
 		f.interpolation = filt.interpolation
-		filt.interpolation = tmp
 	case *transformFilter:
 		switch filt.transformer {
 		case Rotate90Transformer:
@@ -143,10 +142,7 @@ func (f *rotateFilter) Undo(filter Filter) bool {
 	switch filt := filter.(type) {
 	case *rotateFilter:
 		f.rad = gm32.Mod(f.rad-filt.rad, 2*math.Pi)
-
-		tmp := f.interpolation
-		f.interpolation = filt.interpolation
-		filt.interpolation = tmp
+		f.interpolation = filt.oldInterpolation
 	case *transformFilter:
 		switch filt.transformer {
 		case Rotate90Transformer:
@@ -166,9 +162,10 @@ func (f *rotateFilter) Undo(filter Filter) bool {
 
 func (f *rotateFilter) Copy() Filter {
 	return &rotateFilter{
-		rad:           f.rad,
-		interpolation: f.interpolation,
-		mergeCount:    f.mergeCount,
+		rad:              f.rad,
+		interpolation:    f.interpolation,
+		oldInterpolation: f.oldInterpolation,
+		mergeCount:       f.mergeCount,
 	}
 }
 
@@ -180,8 +177,9 @@ func Rotate(rad float32, interpolation Interpolation) MergingFilter {
 	}
 
 	return &rotateFilter{
-		rad:           rad,
-		interpolation: interpolation,
-		mergeCount:    1,
+		rad:              rad,
+		interpolation:    interpolation,
+		oldInterpolation: interpolation,
+		mergeCount:       1,
 	}
 }

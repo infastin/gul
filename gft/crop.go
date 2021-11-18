@@ -169,9 +169,9 @@ func (f *cropEllipseFilter) Apply(dst draw.Image, src image.Image, parallel bool
 // Crops an image with an ellipse of a radii (rx, ry) with the center at a given position (cx, cy).
 // The position and radii parameters must be in the range [0, 1].
 func CropEllipse(cx, cy, rx, ry float32) Filter {
-	maxRad := gm32.Sqrt(cx*cx + cy*cy)
-	maxRad = gm32.RoundN(maxRad, 2)
-	if rx >= maxRad && ry >= maxRad {
+	maxRadius := gm32.Sqrt(cx*cx + cy*cy)
+	maxRadius = gm32.RoundN(maxRadius, 2)
+	if rx >= maxRadius && ry >= maxRadius {
 		return nil
 	}
 

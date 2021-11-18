@@ -13,7 +13,6 @@ type scaleFilter struct {
 	additive bool
 
 	rfilt       ResamplingFilter
-	oldrfilt    ResamplingFilter
 	rfiltScaleX float32
 	rfiltScaleY float32
 
@@ -50,8 +49,9 @@ func (f *scaleFilter) Merge(filter Filter) bool {
 		f.scaleY *= filt.scaleY
 	}
 
-	filt.oldrfilt = f.rfilt
+	tmp := f.rfilt
 	f.rfilt = filt.rfilt
+	filt.rfilt = tmp
 
 	f.rfiltScaleX = filt.rfiltScaleX
 	f.rfiltScaleY = filt.rfiltScaleY
@@ -75,7 +75,9 @@ func (f *scaleFilter) Undo(filter Filter) bool {
 		f.scaleY /= filt.scaleY
 	}
 
-	f.rfilt = filt.oldrfilt
+	tmp := f.rfilt
+	f.rfilt = filt.rfilt
+	filt.rfilt = tmp
 
 	f.rfiltScaleX = filt.rfiltScaleX
 	f.rfiltScaleY = filt.rfiltScaleY
@@ -95,7 +97,6 @@ func (f *scaleFilter) Copy() Filter {
 		scaleY:      f.scaleY,
 		additive:    f.additive,
 		rfilt:       f.rfilt,
-		oldrfilt:    f.oldrfilt,
 		rfiltScaleX: f.rfiltScaleX,
 		rfiltScaleY: f.rfiltScaleY,
 		mergeCount:  f.mergeCount,

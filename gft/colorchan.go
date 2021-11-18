@@ -71,7 +71,7 @@ func (f *combineColorchanFilter) Merge(filter Filter) bool {
 		}
 
 		if fi, ok := f.filters[i].(MergingColorchanFilter); ok {
-			if fi.CanMerge(filt.filters[i]) {
+			if !fi.CanMerge(filt.filters[i]) {
 				return false
 			}
 		} else {

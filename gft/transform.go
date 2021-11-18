@@ -46,32 +46,42 @@ func (f *transformFilter) Apply(dst draw.Image, src image.Image, parallel bool) 
 	})
 }
 
-func (f *transformFilter) Merge(filter Filter) bool {
+func (f *transformFilter) CanMerge(filter Filter) bool {
 	filt, ok := filter.(*transformFilter)
 	if !ok {
 		return false
 	}
 
 	if f.transformer == nil {
-		f.transformer = filt.transformer
-		f.mergeCount++
 		return true
 	}
 
-	out, ok := f.transformer.Merge(filt.transformer)
-	if ok {
-		f.transformer = out
+	if _, ok := f.transformer.Merge(filt.transformer); ok {
 		return true
 	}
 
 	return false
 }
 
+func (f *transformFilter) Merge(filter Filter) {
+	filt := filter.(*transformFilter)
+
+	f.mergeCount++
+
+	if f.transformer == nil {
+		f.transformer = filt.transformer
+		return
+	}
+
+	out, _ := f.transformer.Merge(filt.transformer)
+	f.transformer = out
+}
+
 func (f *transformFilter) Skip() bool {
 	return f.transformer == nil
 }
 
-func (f *transformFilter) Undo(filter Filter) bool {
+func (f *transformFilter) CanUndo(filter Filter) bool {
 	filt, ok := filter.(*transformFilter)
 	if !ok {
 		return false
@@ -81,13 +91,22 @@ func (f *transformFilter) Undo(filter Filter) bool {
 		return false
 	}
 
-	out, ok := filt.transformer.Recreate(f.transformer)
-	if ok {
-		f.transformer = out
+	if _, ok := filt.transformer.Recreate(f.transformer); ok {
 		return true
 	}
 
 	return false
+}
+
+func (f *transformFilter) Undo(filter Filter) bool {
+	filt := filter.(*transformFilter)
+
+	out, _ := filt.transformer.Recreate(f.transformer)
+	f.transformer = out
+
+	f.mergeCount--
+
+	return f.mergeCount == 0
 }
 
 func (f *transformFilter) Copy() Filter {

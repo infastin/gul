@@ -31,9 +31,6 @@ type contribBounds struct {
 }
 
 type resampler struct {
-	clistx [][]contrib
-	clisty [][]contrib
-
 	filtScaleX float32
 	filtScaleY float32
 
@@ -89,6 +86,7 @@ func (r *resampler) makeCList(dst, src segment, filtScale float32) [][]contrib {
 		return nil
 	}
 
+	ooFiltScale := 1.0 / filtScale
 	tmp := make([]contrib, 0, n)
 
 	for i := dst.Min; i < dst.Max; i++ {
@@ -98,7 +96,7 @@ func (r *resampler) makeCList(dst, src segment, filtScale float32) [][]contrib {
 
 		var sum float32
 		for j := left; j <= right; j++ {
-			weight := (r.filt.Kernel(center-float32(j)) * scale) / filtScale
+			weight := r.filt.Kernel((center - float32(j)) * scale * ooFiltScale)
 			if weight == 0 {
 				continue
 			}
@@ -140,13 +138,11 @@ func (r *resampler) resampleX(dst draw.Image, src image.Image, parallel bool) {
 	dstb := dst.Bounds()
 	srcb := src.Bounds()
 
-	if r.clistx == nil {
-		r.clistx = r.makeCList(
-			makeSegment(dstb.Min.X, dstb.Max.X),
-			makeSegment(srcb.Min.X, srcb.Max.X),
-			r.filtScaleX,
-		)
-	}
+	clistx := r.makeCList(
+		makeSegment(dstb.Min.X, dstb.Max.X),
+		makeSegment(srcb.Min.X, srcb.Max.X),
+		r.filtScaleX,
+	)
 
 	pixGetter := newPixelGetter(src)
 	pixSetter := newPixelSetter(dst)
@@ -162,7 +158,7 @@ func (r *resampler) resampleX(dst draw.Image, src image.Image, parallel bool) {
 
 		for y := start; y < end; y++ {
 			pixGetter.getPixelRow(y, &srcBuf)
-			r.resampleSegment(dstBuf, srcBuf, r.clistx)
+			r.resampleSegment(dstBuf, srcBuf, clistx)
 			pixSetter.setPixelRow(dstb.Min.Y+y-srcb.Min.Y, dstBuf)
 		}
 	})
@@ -172,13 +168,11 @@ func (r *resampler) resampleY(dst draw.Image, src image.Image, parallel bool) {
 	dstb := dst.Bounds()
 	srcb := src.Bounds()
 
-	if r.clisty == nil {
-		r.clisty = r.makeCList(
-			makeSegment(dstb.Min.Y, dstb.Max.Y),
-			makeSegment(srcb.Min.Y, srcb.Max.Y),
-			r.filtScaleY,
-		)
-	}
+	clisty := r.makeCList(
+		makeSegment(dstb.Min.Y, dstb.Max.Y),
+		makeSegment(srcb.Min.Y, srcb.Max.Y),
+		r.filtScaleY,
+	)
 
 	pixGetter := newPixelGetter(src)
 	pixSetter := newPixelSetter(dst)
@@ -194,7 +188,7 @@ func (r *resampler) resampleY(dst draw.Image, src image.Image, parallel bool) {
 
 		for x := start; x < end; x++ {
 			pixGetter.getPixelColumn(x, &srcBuf)
-			r.resampleSegment(dstBuf, srcBuf, r.clisty)
+			r.resampleSegment(dstBuf, srcBuf, clisty)
 			pixSetter.setPixelColumn(dstb.Min.X+x-srcb.Min.X, dstBuf)
 		}
 	})

@@ -5,12 +5,14 @@ import (
 	"image/draw"
 
 	"github.com/infastin/gul/gm32"
+	"github.com/infastin/gul/tools"
 	"github.com/srwiley/rasterx"
 )
 
 type cropRectangleFilter struct {
 	startX, startY float32
 	width, height  float32
+	mergeCount     uint
 }
 
 func (f *cropRectangleFilter) Bounds(src image.Rectangle) image.Rectangle {
@@ -18,8 +20,8 @@ func (f *cropRectangleFilter) Bounds(src image.Rectangle) image.Rectangle {
 	srcWidth := float32(srcb.Dx())
 	srcHeight := float32(srcb.Dy())
 
-	dstWidth := int(gm32.Round(srcWidth * f.width))
-	dstHeight := int(gm32.Round(srcHeight * f.height))
+	dstWidth := int(gm32.Floor(srcWidth * f.width))
+	dstHeight := int(gm32.Floor(srcHeight * f.height))
 
 	return image.Rect(0, 0, dstWidth, dstHeight)
 }
@@ -30,17 +32,40 @@ func (f *cropRectangleFilter) Apply(dst draw.Image, src image.Image, parallel bo
 	srcHeight := srcb.Dy()
 
 	dstb := dst.Bounds()
-	startX := int(gm32.Round(float32(srcWidth) * f.startX))
-	startY := int(gm32.Round(float32(srcHeight) * f.startY))
+	startX := int(gm32.Floor(float32(srcWidth)*f.startX)) + srcb.Min.X
+	startY := int(gm32.Floor(float32(srcHeight)*f.startY)) + srcb.Min.Y
 
-	draw.Draw(dst, dstb, src, image.Pt(startX, startY), draw.Over)
+	pixGetter := newPixelGetter(src)
+	pixSetter := newPixelSetter(dst)
+
+	procs := 1
+	if parallel {
+		procs = 0
+	}
+
+	tools.Parallelize(procs, dstb.Min.Y, dstb.Max.Y, 1, func(start, end int) {
+		for yi := start; yi < end; yi++ {
+			for xi := dstb.Min.X; xi < dstb.Max.X; xi++ {
+				x2 := xi - dstb.Min.X + startX
+				y2 := yi - dstb.Min.Y + startY
+
+				pix := pixGetter.getPixel(x2, y2)
+				pixSetter.setPixel(xi, yi, pix)
+			}
+		}
+	})
 }
 
-func (f *cropRectangleFilter) Merge(filter Filter) bool {
-	filt, ok := filter.(*cropRectangleFilter)
-	if !ok {
-		return false
+func (f *cropRectangleFilter) CanMerge(filter Filter) bool {
+	if _, ok := filter.(*cropRectangleFilter); ok {
+		return true
 	}
+
+	return false
+}
+
+func (f *cropRectangleFilter) Merge(filter Filter) {
+	filt := filter.(*cropRectangleFilter)
 
 	f.startX += filt.startX * f.width
 	f.startY += filt.startY * f.height
@@ -48,14 +73,19 @@ func (f *cropRectangleFilter) Merge(filter Filter) bool {
 	f.width *= filt.width
 	f.height *= filt.height
 
-	return true
+	f.mergeCount++
+}
+
+func (f *cropRectangleFilter) CanUndo(filter Filter) bool {
+	if _, ok := filter.(*cropRectangleFilter); ok {
+		return true
+	}
+
+	return false
 }
 
 func (f *cropRectangleFilter) Undo(filter Filter) bool {
-	filt, ok := filter.(*cropRectangleFilter)
-	if !ok {
-		return false
-	}
+	filt := filter.(*cropRectangleFilter)
 
 	f.height /= filt.height
 	f.width /= filt.width
@@ -63,7 +93,9 @@ func (f *cropRectangleFilter) Undo(filter Filter) bool {
 	f.startX -= filt.startX * f.width
 	f.startY -= filt.startY * f.height
 
-	return false
+	f.mergeCount--
+
+	return f.mergeCount == 0
 }
 
 func (f *cropRectangleFilter) Skip() bool {
@@ -103,10 +135,11 @@ func CropRectangle(startX, startY, width, height float32) MergingFilter {
 	}
 
 	return &cropRectangleFilter{
-		startX: startX,
-		startY: startY,
-		width:  width,
-		height: height,
+		startX:     startX,
+		startY:     startY,
+		width:      width,
+		height:     height,
+		mergeCount: 1,
 	}
 }
 

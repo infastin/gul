@@ -36,11 +36,16 @@ func (f *scaleFilter) Apply(dst draw.Image, src image.Image, parallel bool) {
 	resamp.resample(dst, src, true)
 }
 
-func (f *scaleFilter) Merge(filter Filter) bool {
-	filt, ok := filter.(*scaleFilter)
-	if !ok {
-		return false
+func (f *scaleFilter) CanMerge(filter Filter) bool {
+	if _, ok := filter.(*scaleFilter); ok {
+		return true
 	}
+
+	return false
+}
+
+func (f *scaleFilter) Merge(filter Filter) {
+	filt := filter.(*scaleFilter)
 
 	if filt.additive {
 		f.scaleX += filt.scaleX
@@ -57,15 +62,18 @@ func (f *scaleFilter) Merge(filter Filter) bool {
 	f.rfiltScaleY = filt.rfiltScaleY
 
 	f.mergeCount++
+}
 
-	return true
+func (f *scaleFilter) CanUndo(filter Filter) bool {
+	if _, ok := filter.(*scaleFilter); ok {
+		return true
+	}
+
+	return false
 }
 
 func (f *scaleFilter) Undo(filter Filter) bool {
-	filt, ok := filter.(*scaleFilter)
-	if !ok {
-		return false
-	}
+	filt := filter.(*scaleFilter)
 
 	if filt.additive {
 		f.scaleX = gm32.Max(1.0e-5, f.scaleX-filt.scaleX)

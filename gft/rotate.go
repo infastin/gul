@@ -111,7 +111,21 @@ func (f *rotateFilter) Apply(dst draw.Image, src image.Image, parallel bool) {
 	})
 }
 
-func (f *rotateFilter) Merge(filter Filter) bool {
+func (f *rotateFilter) CanMerge(filter Filter) bool {
+	switch filt := filter.(type) {
+	case *rotateFilter:
+		return true
+	case *transformFilter:
+		switch filt.transformer {
+		case Rotate90Transformer, Rotate180Transformer, Rotate270Transformer:
+			return true
+		}
+	}
+
+	return false
+}
+
+func (f *rotateFilter) Merge(filter Filter) {
 	switch filt := filter.(type) {
 	case *rotateFilter:
 		f.rad = gm32.Mod(f.rad+filt.rad, 2*math.Pi)
@@ -125,17 +139,32 @@ func (f *rotateFilter) Merge(filter Filter) bool {
 			f.rad = gm32.Mod(f.rad+math.Pi, 2*math.Pi)
 		case Rotate270Transformer:
 			f.rad = gm32.Mod(f.rad+3*math.Pi/2, 2*math.Pi)
+		default:
+			return
 		}
 	default:
-		return false
+		return
 	}
 
 	f.mergeCount++
-	return true
 }
 
 func (f *rotateFilter) Skip() bool {
 	return f.rad == 0
+}
+
+func (f *rotateFilter) CanUndo(filter Filter) bool {
+	switch filt := filter.(type) {
+	case *rotateFilter:
+		return true
+	case *transformFilter:
+		switch filt.transformer {
+		case Rotate90Transformer, Rotate180Transformer, Rotate270Transformer:
+			return true
+		}
+	}
+
+	return false
 }
 
 func (f *rotateFilter) Undo(filter Filter) bool {
@@ -151,6 +180,8 @@ func (f *rotateFilter) Undo(filter Filter) bool {
 			f.rad = gm32.Mod(f.rad-math.Pi, 2*math.Pi)
 		case Rotate270Transformer:
 			f.rad = gm32.Mod(f.rad-3*math.Pi/2, 2*math.Pi)
+		default:
+			return false
 		}
 	default:
 		return false

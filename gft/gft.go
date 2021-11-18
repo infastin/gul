@@ -22,13 +22,18 @@ type Filter interface {
 type MergingFilter interface {
 	Filter
 
-	// If possible, merges one filter into an instance of interface and returns true.
+	// Returns true, if it is possible to merge one filter into an instance of interface.
 	// Otherwise, returns false.
-	Merge(filter Filter) bool
+	CanMerge(filter Filter) bool
 
-	// Operation opposite to Merge.
-	// If possible, demerges one filter from an instance of interface.
-	// If not, returns false.
+	// Returns true, if it is possible to demerge one filter from an instance of interface.
+	// Otherwise, returns false.
+	CanUndo(filter Filter) bool
+
+	// Merges one filter into an instance of interface.
+	Merge(filter Filter)
+
+	// Demerges one filter from an instance of interface.
 	// If got nothing after decombination, returns true.
 	// Otherwise, returns false.
 	Undo(filter Filter) bool
@@ -78,7 +83,8 @@ func (l *List) Add(filt Filter) {
 		last := l.filters[len(l.filters)-1]
 
 		if last, ok := last.(MergingFilter); ok {
-			if last.Merge(filt) {
+			if last.CanMerge(filt) {
+				last.Merge(filt)
 				return
 			}
 		}
@@ -94,8 +100,10 @@ func (l *List) Undo(filt Filter) {
 
 	last := l.filters[len(l.filters)-1]
 	if last, ok := last.(MergingFilter); ok {
-		if last.Undo(filt) {
-			l.filters = l.filters[:len(l.filters)-1]
+		if last.CanUndo(filt) {
+			if last.Undo(filt) {
+				l.filters = l.filters[:len(l.filters)-1]
+			}
 		}
 	} else {
 		l.filters = l.filters[:len(l.filters)-1]

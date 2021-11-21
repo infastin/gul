@@ -34,7 +34,7 @@ type MergingFilter interface {
 	Merge(filter Filter)
 
 	// Demerges one filter from an instance of interface.
-	// If got nothing after decombination, returns true.
+	// If got nothing after demerging, returns true.
 	// Otherwise, returns false.
 	Undo(filter Filter) bool
 

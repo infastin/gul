@@ -100,8 +100,8 @@ type Matrix32 struct {
 }
 
 func New32(m, n int) func(data ...float32) *Matrix32 {
-	if m < 0 || n < 0 {
-		panic("the m and n parameters must be positive")
+	if m <= 0 || n <= 0 {
+		panic("the m and n parameters must be > 0")
 	}
 
 	ctor := func(data ...float32) *Matrix32 {

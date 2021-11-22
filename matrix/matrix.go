@@ -6,7 +6,15 @@ type Matrix64 struct {
 }
 
 func New64(m, n int) func(data ...float64) *Matrix64 {
+	if m < 0 || n < 0 {
+		panic("the m and n parameters must be positive")
+	}
+
 	ctor := func(data ...float64) *Matrix64 {
+		if len(data) > m*n {
+			panic("the number of input values should not be greater than m * n")
+		}
+
 		o := &Matrix64{
 			M:    m,
 			N:    n,
@@ -33,7 +41,7 @@ func (m1 *Matrix64) Add(m2 *Matrix64) *Matrix64 {
 
 	for i := 0; i < o.M; i++ {
 		for j := 0; j < o.N; j++ {
-			o.Data[i+j*o.M] = m1.Data[i+j*m1.M] + m2.Data[i+j*m2.M]
+			o.Data[j+i*o.N] = m1.Data[j+i*m1.N] + m2.Data[j+i*m2.N]
 		}
 	}
 
@@ -53,7 +61,7 @@ func (m1 *Matrix64) Sub(m2 *Matrix64) *Matrix64 {
 
 	for i := 0; i < o.M; i++ {
 		for j := 0; j < o.N; j++ {
-			o.Data[i+j*o.M] = m1.Data[i+j*m1.M] - m2.Data[i+j*m2.M]
+			o.Data[j+i*o.N] = m1.Data[j+i*m1.N] - m2.Data[j+i*m2.N]
 		}
 	}
 
@@ -61,8 +69,8 @@ func (m1 *Matrix64) Sub(m2 *Matrix64) *Matrix64 {
 }
 
 func (m1 *Matrix64) Mul(m2 *Matrix64) *Matrix64 {
-	if m1.M != m2.N {
-		panic("trying to multiply matrices with different columns and rows number")
+	if m1.N != m2.M {
+		panic("trying to multiply matrices with different number of rows and columns")
 	}
 
 	o := &Matrix64{
@@ -73,8 +81,8 @@ func (m1 *Matrix64) Mul(m2 *Matrix64) *Matrix64 {
 
 	for i := 0; i < o.M; i++ {
 		for j := 0; j < o.N; j++ {
-			for k := 0; k < m1.M; k++ {
-				o.Data[i+j*o.M] += m1.Data[i+k*m1.M] * m2.Data[k+j*m2.M]
+			for k := 0; k < m1.N; k++ {
+				o.Data[j+i*o.N] += m1.Data[k+i*m1.N] * m2.Data[j+k*m2.N]
 			}
 		}
 	}
@@ -83,7 +91,7 @@ func (m1 *Matrix64) Mul(m2 *Matrix64) *Matrix64 {
 }
 
 func (m *Matrix64) Index(i, j int) float64 {
-	return m.Data[i+j*m.M]
+	return m.Data[j+i*m.N]
 }
 
 type Matrix32 struct {
@@ -92,7 +100,15 @@ type Matrix32 struct {
 }
 
 func New32(m, n int) func(data ...float32) *Matrix32 {
+	if m < 0 || n < 0 {
+		panic("the m and n parameters must be positive")
+	}
+
 	ctor := func(data ...float32) *Matrix32 {
+		if len(data) > m*n {
+			panic("the number of input values should not be greater than m * n")
+		}
+
 		o := &Matrix32{
 			M:    m,
 			N:    n,
@@ -119,7 +135,7 @@ func (m1 *Matrix32) Add(m2 *Matrix32) *Matrix32 {
 
 	for i := 0; i < o.M; i++ {
 		for j := 0; j < o.N; j++ {
-			o.Data[i+j*o.M] = m1.Data[i+j*m1.M] + m2.Data[i+j*m2.M]
+			o.Data[j+i*o.N] = m1.Data[j+i*m1.N] + m2.Data[j+i*m2.N]
 		}
 	}
 
@@ -139,7 +155,7 @@ func (m1 *Matrix32) Sub(m2 *Matrix32) *Matrix32 {
 
 	for i := 0; i < o.M; i++ {
 		for j := 0; j < o.N; j++ {
-			o.Data[i+j*o.M] = m1.Data[i+j*m1.M] - m2.Data[i+j*m2.M]
+			o.Data[j+i*o.N] = m1.Data[j+i*m1.N] - m2.Data[j+i*m2.N]
 		}
 	}
 
@@ -148,7 +164,7 @@ func (m1 *Matrix32) Sub(m2 *Matrix32) *Matrix32 {
 
 func (m1 *Matrix32) Mul(m2 *Matrix32) *Matrix32 {
 	if m1.N != m2.M {
-		panic("trying to multiply matrices with different columns and rows number")
+		panic("trying to multiply matrices with different number of rows and columns")
 	}
 
 	o := &Matrix32{
@@ -160,7 +176,7 @@ func (m1 *Matrix32) Mul(m2 *Matrix32) *Matrix32 {
 	for i := 0; i < o.M; i++ {
 		for j := 0; j < o.N; j++ {
 			for k := 0; k < m1.N; k++ {
-				o.Data[i+j*o.M] += m1.Data[i+k*m1.M] * m2.Data[k+j*m2.M]
+				o.Data[j+i*o.N] += m1.Data[k+i*m1.N] * m2.Data[j+k*m2.N]
 			}
 		}
 	}
@@ -169,5 +185,5 @@ func (m1 *Matrix32) Mul(m2 *Matrix32) *Matrix32 {
 }
 
 func (m *Matrix32) Index(i, j int) float32 {
-	return m.Data[i+j*m.M]
+	return m.Data[j+i*m.N]
 }

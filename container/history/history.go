@@ -1,5 +1,7 @@
 package history
 
+import "fmt"
+
 type History struct {
 	index  int
 	values []interface{}
@@ -31,25 +33,27 @@ func (h *History) Set(val interface{}) {
 	h.index++
 }
 
-func (h *History) Back() interface{} {
-	if h.index <= 0 {
-		if h.index == 0 {
-			h.index--
-		}
-		return h.Defv
+func (h *History) Back() (interface{}, error) {
+	if h.index == -1 {
+		return nil, fmt.Errorf("already at the beginning")
+	}
+
+	if h.index == 0 {
+		h.index--
+		return h.Defv, nil
 	}
 
 	h.index--
-	return h.values[h.index]
+	return h.values[h.index], nil
 }
 
-func (h *History) Forward() interface{} {
+func (h *History) Forward() (interface{}, error) {
 	if h.index >= len(h.values)-1 {
-		return h.Defv
+		return nil, fmt.Errorf("already at the end")
 	}
 
 	h.index++
-	return h.values[h.index]
+	return h.values[h.index], nil
 }
 
 func (h *History) Get() interface{} {

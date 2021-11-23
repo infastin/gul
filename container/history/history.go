@@ -32,8 +32,10 @@ func (h *History) Set(val interface{}) {
 }
 
 func (h *History) Back() interface{} {
-	if h.index == 0 {
-		h.index--
+	if h.index <= 0 {
+		if h.index == 0 {
+			h.index--
+		}
 		return h.Defv
 	}
 

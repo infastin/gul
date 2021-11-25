@@ -32,6 +32,11 @@ func New(monoms ...Monomial) *Polynomial {
 	return p
 }
 
+var (
+	Zero = New()
+	One  = New(Monomial{Coef: 1, Degree: 0})
+)
+
 func (p *Polynomial) addMonom(monom Monomial) {
 	for it := p.monoms.Front(); it != nil; it = it.Next() {
 		m := it.Value.(Monomial)
@@ -266,7 +271,7 @@ func (p1 *Polynomial) DivMod(p2 *Polynomial) (q, r *Polynomial) {
 	r = p1
 	d := p2
 
-	for !r.IsZero() && r.degree >= d.degree {
+	for r.degree != 0 && r.degree >= d.degree {
 		m1 := r.monoms.Back().Value.(Monomial)
 		m2 := d.monoms.Back().Value.(Monomial)
 
@@ -292,15 +297,42 @@ func (p1 *Polynomial) Mod(p2 *Polynomial) *Polynomial {
 	return r
 }
 
+func (p1 *Polynomial) Equal(p2 *Polynomial) bool {
+	if p1.degree != p2.degree {
+		return false
+	}
+
+	if p1.monoms.Len() != p2.monoms.Len() {
+		return false
+	}
+
+	it1 := p1.monoms.Front()
+	it2 := p2.monoms.Front()
+
+	for it1 != nil {
+		m1 := it1.Value.(Monomial)
+		m2 := it2.Value.(Monomial)
+
+		if m1.Coef != m2.Coef || m1.Degree != m2.Degree {
+			return false
+		}
+
+		it1 = it1.Next()
+		it2 = it2.Next()
+	}
+
+	return true
+}
+
 func (p1 *Polynomial) Gcd(p2 *Polynomial) *Polynomial {
 	a, b := p1, p2
 	var gcd *Polynomial
 
-	for !b.IsZero() {
-		gcd = b
+	for b.Degree() != 0 {
 		_, r := a.DivMod(b)
 		a = b
 		b = r
+		gcd = b
 	}
 
 	if gcd == nil {
@@ -308,10 +340,6 @@ func (p1 *Polynomial) Gcd(p2 *Polynomial) *Polynomial {
 	}
 
 	return gcd
-}
-
-func (p *Polynomial) IsZero() bool {
-	return p.monoms.Len() == 0
 }
 
 func (p *Polynomial) Degree() int {

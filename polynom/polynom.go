@@ -292,7 +292,7 @@ func (p1 *Polynomial) Mod(p2 *Polynomial) *Polynomial {
 	return r
 }
 
-func (p1 *Polynomial) Euclidean(p2 *Polynomial) *Polynomial {
+func (p1 *Polynomial) Gcd(p2 *Polynomial) *Polynomial {
 	a, b := p1, p2
 	var gcd *Polynomial
 

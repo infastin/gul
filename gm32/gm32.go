@@ -94,3 +94,8 @@ func Ceil(x float32) float32 {
 func Clamp(val, min, max float32) float32 {
 	return Min(Max(min, val), max)
 }
+
+func Hypot(p, q float32) float32 {
+	f := math.Hypot(float64(p), float64(q))
+	return float32(f)
+}

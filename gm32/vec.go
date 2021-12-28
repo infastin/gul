@@ -1,5 +1,7 @@
 package gm32
 
+import "fmt"
+
 type Vec2 [2]float32
 
 func (v Vec2) Len() float32 {
@@ -99,4 +101,143 @@ func (v Vec4) Mul(c float32) Vec4 {
 
 func (v Vec4) Elem() (x, y, z, w float32) {
 	return v[0], v[1], v[2], v[3]
+}
+
+type Vec struct {
+	N    int
+	Data []float32
+}
+
+func NewVec(n int) func(data ...float32) *Vec {
+	if n <= 0 {
+		err := fmt.Errorf("the n parameter must be positive (got %d)", n)
+		panic(err)
+	}
+
+	ctor := func(data ...float32) *Vec {
+		if len(data) > n {
+			err := fmt.Errorf("the number of input values must not be greater than n (%d)", n)
+			panic(err)
+		}
+
+		o := &Vec{
+			N:    n,
+			Data: make([]float32, n),
+		}
+
+		copy(o.Data, data)
+		return o
+	}
+
+	return ctor
+}
+
+func (v *Vec) Copy() *Vec {
+	cp := &Vec{
+		N:    v.N,
+		Data: make([]float32, v.N),
+	}
+
+	copy(cp.Data, v.Data)
+
+	return cp
+}
+
+func (v1 *Vec) Add(v2 *Vec) *Vec {
+	if v1.N != v2.N {
+		err := fmt.Errorf(
+			"the first and second vectors have different sized (got %d and %d)",
+			v1.N, v2.N,
+		)
+		panic(err)
+	}
+
+	o := &Vec{
+		N:    v1.N,
+		Data: make([]float32, v1.N),
+	}
+
+	for i := 0; i < o.N; i++ {
+		o.Data[i] = v1.Data[i] + v2.Data[i]
+	}
+
+	return o
+}
+
+func (v1 *Vec) Sub(v2 *Vec) *Vec {
+	if v1.N != v2.N {
+		err := fmt.Errorf(
+			"the first and second vectors have different sized (got %d and %d)",
+			v1.N, v2.N,
+		)
+		panic(err)
+	}
+
+	o := &Vec{
+		N:    v1.N,
+		Data: make([]float32, v1.N),
+	}
+
+	for i := 0; i < o.N; i++ {
+		o.Data[i] = v1.Data[i] - v2.Data[i]
+	}
+
+	return o
+}
+
+func (v *Vec) Mul(c float32) *Vec {
+	o := &Vec{
+		N:    v.N,
+		Data: make([]float32, v.N),
+	}
+
+	for i := 0; i < o.N; i++ {
+		o.Data[i] = v.Data[i] * c
+	}
+
+	return o
+}
+
+func (v *Vec) Len() float32 {
+	sum := float32(0)
+	for i := 0; i < v.N; i++ {
+		sum += v.Data[i] * v.Data[i]
+	}
+	return Sqrt(sum)
+}
+
+func (v *Vec) Normalize() *Vec {
+	o := &Vec{
+		N:    v.N,
+		Data: make([]float32, v.N),
+	}
+
+	l := 1.0 / v.Len()
+
+	for i := 0; i < o.N; i++ {
+		o.Data[i] = v.Data[i] * l
+	}
+
+	return o
+}
+
+func (v1 *Vec) Dot(v2 *Vec) float32 {
+	if v1.N != v2.N {
+		err := fmt.Errorf(
+			"the first and second vectors have different sized (got %d and %d)",
+			v1.N, v2.N,
+		)
+		panic(err)
+	}
+
+	sum := float32(0)
+	for i := 0; i < v1.N; i++ {
+		sum += v1.Data[i] * v2.Data[i]
+	}
+
+	return sum
+}
+
+func (v *Vec) String() string {
+	return fmt.Sprint(v.Data)
 }

@@ -1,6 +1,10 @@
 package gm32
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+	"text/tabwriter"
+)
 
 type Mat struct {
 	M, N int
@@ -135,6 +139,11 @@ func (m1 *Mat) MulMat(m2 *Mat) *Mat {
 }
 
 func (m *Mat) At(i, j int) float32 {
+	if i < 0 || j < 0 {
+		err := fmt.Errorf("the i and j parameters must be non-negative (got %d and %d)", i, j)
+		panic(err)
+	}
+
 	if i >= m.M || j >= m.N {
 		err := fmt.Errorf(
 			"trying to get a value out of matrix bounds (got position (%d, %d) while matrix size is (%dx%d))",
@@ -147,6 +156,11 @@ func (m *Mat) At(i, j int) float32 {
 }
 
 func (m *Mat) Set(i, j int, value float32) {
+	if i < 0 || j < 0 {
+		err := fmt.Errorf("the i and j parameters must be non-negative (got %d and %d)", i, j)
+		panic(err)
+	}
+
 	if i >= m.M || j >= m.N {
 		err := fmt.Errorf(
 			"trying to set a value out of matrix bounds (got position (%d, %d) while matrix size is (%dx%d))",
@@ -272,4 +286,54 @@ func (m *Mat) Transpose() *Mat {
 	}
 
 	return o
+}
+
+func (m *Mat) Row(i int) *Vec {
+	if i < 0 {
+		err := fmt.Errorf("the i parameter must be non-negative (got %d)", i)
+		panic(err)
+	}
+
+	if i >= m.M {
+		err := fmt.Errorf("trying to get a row out of matrix bounds (got row index %d, while matrix has only %d rows)", i, m.M)
+		panic(err)
+	}
+
+	return NewVec(m.N)(m.Data[i*m.N : (i+1)*m.N]...)
+}
+
+func (m *Mat) Col(j int) *Vec {
+	if j < 0 {
+		err := fmt.Errorf("the j parameter must be non-negative (got %d)", j)
+		panic(err)
+	}
+
+	if j >= m.N {
+		err := fmt.Errorf("trying to get a column out of matrix bounds (got column index %d, while matrix has only %d columns)", j, m.N)
+		panic(err)
+	}
+
+	col := make([]float32, m.M)
+	for i := 0; i < m.M; i++ {
+		col[i] = m.Data[j+i*m.N]
+	}
+
+	return NewVec(m.M)(col...)
+}
+
+func (m *Mat) String() string {
+	sb := &strings.Builder{}
+	w := tabwriter.NewWriter(sb, 4, 4, 1, ' ', 0)
+
+	for i := 0; i < m.M; i++ {
+		for j := 0; j < m.N; j++ {
+			fmt.Fprintf(w, "%f\t", m.Data[j+i*m.N])
+		}
+
+		fmt.Fprintf(w, "\n")
+	}
+
+	w.Flush()
+
+	return sb.String()
 }

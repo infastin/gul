@@ -3,6 +3,8 @@ package gm64
 import (
 	"fmt"
 	"math"
+	"strings"
+	"text/tabwriter"
 )
 
 type Mat struct {
@@ -138,6 +140,11 @@ func (m1 *Mat) MulMat(m2 *Mat) *Mat {
 }
 
 func (m *Mat) At(i, j int) float64 {
+	if i < 0 || j < 0 {
+		err := fmt.Errorf("the i and j parameters must be non-negative (got %d and %d)", i, j)
+		panic(err)
+	}
+
 	if i >= m.M || j >= m.N {
 		err := fmt.Errorf(
 			"trying to get a value out of matrix bounds (got position (%d, %d) while matrix size is (%dx%d))",
@@ -150,6 +157,11 @@ func (m *Mat) At(i, j int) float64 {
 }
 
 func (m *Mat) Set(i, j int, value float64) {
+	if i < 0 || j < 0 {
+		err := fmt.Errorf("the i and j parameters must be non-negative (got %d and %d)", i, j)
+		panic(err)
+	}
+
 	if i >= m.M || j >= m.N {
 		err := fmt.Errorf(
 			"trying to set a value out of matrix bounds (got position (%d, %d) while matrix size is (%dx%d))",
@@ -275,4 +287,23 @@ func (m *Mat) Transpose() *Mat {
 	}
 
 	return o
+}
+
+func (m *Mat) String() string {
+	sb := &strings.Builder{}
+	w := tabwriter.NewWriter(sb, 4, 4, 1, ' ', 0)
+
+	for i := 0; i < m.M; i++ {
+		for j := 0; j < m.N; j++ {
+			fmt.Fprintf(w, "%f\t", m.Data[j+i*m.N])
+		}
+
+		if i != m.M-1 {
+			fmt.Fprintf(w, "\n")
+		}
+	}
+
+	w.Flush()
+
+	return sb.String()
 }

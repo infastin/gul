@@ -1,13 +1,12 @@
-package gm64
+package poly
 
 import (
 	"container/list"
 	"fmt"
-	"math"
 )
 
 type Monomial struct {
-	Coef   float64
+	Coef   float32
 	Degree int
 }
 
@@ -346,11 +345,11 @@ func (p *Polynomial) Degree() int {
 	return p.degree
 }
 
-func (p *Polynomial) Calc(x float64) float64 {
-	var fx float64
+func (p *Polynomial) Calc(x float32) float32 {
+	var fx float32
 	for it := p.monoms.Front(); it != nil; it = it.Next() {
 		m := it.Value.(Monomial)
-		fx += m.Coef * math.Pow(x, float64(m.Degree))
+		fx += m.Coef * Pow(x, float32(m.Degree))
 	}
 	return fx
 }
@@ -374,8 +373,8 @@ func (p *Polynomial) String() string {
 			res += "-"
 		}
 
-		if math.Abs(m.Coef) != 1 || m.Degree == 0 {
-			res += fmt.Sprintf("%.2f", math.Abs(m.Coef))
+		if Abs(m.Coef) != 1 || m.Degree == 0 {
+			res += fmt.Sprintf("%.2f", Abs(m.Coef))
 		}
 
 		if m.Degree != 0 {

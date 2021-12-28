@@ -1,4 +1,4 @@
-package polynom
+package gm64
 
 import (
 	"container/list"

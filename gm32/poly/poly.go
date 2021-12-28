@@ -3,6 +3,7 @@ package poly
 import (
 	"container/list"
 	"fmt"
+	"github.com/infastin/gul/gm32"
 )
 
 type Monomial struct {
@@ -349,7 +350,7 @@ func (p *Polynomial) Calc(x float32) float32 {
 	var fx float32
 	for it := p.monoms.Front(); it != nil; it = it.Next() {
 		m := it.Value.(Monomial)
-		fx += m.Coef * Pow(x, float32(m.Degree))
+		fx += m.Coef * gm32.Pow(x, float32(m.Degree))
 	}
 	return fx
 }
@@ -373,8 +374,8 @@ func (p *Polynomial) String() string {
 			res += "-"
 		}
 
-		if Abs(m.Coef) != 1 || m.Degree == 0 {
-			res += fmt.Sprintf("%.2f", Abs(m.Coef))
+		if gm32.Abs(m.Coef) != 1 || m.Degree == 0 {
+			res += fmt.Sprintf("%.2f", gm32.Abs(m.Coef))
 		}
 
 		if m.Degree != 0 {

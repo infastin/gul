@@ -6,7 +6,6 @@ import (
 	"image/draw"
 
 	"github.com/infastin/gul/gm32"
-	"github.com/infastin/gul/matrix"
 )
 
 type pixel struct {
@@ -353,36 +352,36 @@ func bicubicInterpolation(pixGetter *pixelGetter, x, y, a float32) pixel {
 	p32 := pixGetter.getPixel(x2, y3)
 	p33 := pixGetter.getPixel(x3, y3)
 
-	xMat := matrix.New32(1, 4)(
+	xMat := gm32.NewMat(1, 4)(
 		fx0, fx1, fx2, fx3,
 	)
 
-	yMat := matrix.New32(4, 1)(
+	yMat := gm32.NewMat(4, 1)(
 		fy0, fy1, fy2, fy3,
 	)
 
-	redMat := matrix.New32(4, 4)(
+	redMat := gm32.NewMat(4, 4)(
 		p00.r, p01.r, p02.r, p03.r,
 		p10.r, p11.r, p12.r, p13.r,
 		p20.r, p21.r, p22.r, p23.r,
 		p30.r, p31.r, p32.r, p33.r,
 	)
 
-	greenMat := matrix.New32(4, 4)(
+	greenMat := gm32.NewMat(4, 4)(
 		p00.g, p01.g, p02.g, p03.g,
 		p10.g, p11.g, p12.g, p13.g,
 		p20.g, p21.g, p22.g, p23.g,
 		p30.g, p31.g, p32.g, p33.g,
 	)
 
-	blueMat := matrix.New32(4, 4)(
+	blueMat := gm32.NewMat(4, 4)(
 		p00.b, p01.b, p02.b, p03.b,
 		p10.b, p11.b, p12.b, p13.b,
 		p20.b, p21.b, p22.b, p23.b,
 		p30.b, p31.b, p32.b, p33.b,
 	)
 
-	alphaMat := matrix.New32(4, 4)(
+	alphaMat := gm32.NewMat(4, 4)(
 		p00.a, p01.a, p02.a, p03.a,
 		p10.a, p11.a, p12.a, p13.a,
 		p20.a, p21.a, p22.a, p23.a,

@@ -2,8 +2,6 @@ package gm64
 
 import (
 	"math"
-
-	"github.com/infastin/gul/matrix"
 )
 
 func InterpolateLinear(v0, v1, t float32) float32 {
@@ -30,7 +28,7 @@ func bicubicKernel(x, a float64) float64 {
 	}
 }
 
-func InterpolateBicubic(left, mid, right *matrix.Matrix64, a float64) float64 {
+func InterpolateBicubic(left, mid, right *Mat, a float64) float64 {
 	for i := 0; i < left.N; i++ {
 		left.Data[i] = bicubicKernel(left.Data[i], a)
 	}
@@ -39,5 +37,5 @@ func InterpolateBicubic(left, mid, right *matrix.Matrix64, a float64) float64 {
 		right.Data[i] = bicubicKernel(right.Data[i], a)
 	}
 
-	return left.Mul(mid).Mul(right).Data[0]
+	return left.MulMat(mid).MulMat(right).Data[0]
 }

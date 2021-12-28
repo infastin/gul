@@ -1,7 +1,5 @@
 package gm32
 
-import "github.com/infastin/gul/matrix"
-
 func InterpolateLinear(v0, v1, t float32) float32 {
 	return (1-t)*v0 + t*v1
 }
@@ -26,7 +24,7 @@ func bicubicKernel(x, a float32) float32 {
 	}
 }
 
-func InterpolateBicubic(left, mid, right *matrix.Matrix32, a float32) float32 {
+func InterpolateBicubic(left, mid, right *Mat, a float32) float32 {
 	for i := 0; i < left.N; i++ {
 		left.Data[i] = bicubicKernel(left.Data[i], a)
 	}
@@ -35,5 +33,5 @@ func InterpolateBicubic(left, mid, right *matrix.Matrix32, a float32) float32 {
 		right.Data[i] = bicubicKernel(right.Data[i], a)
 	}
 
-	return left.Mul(mid).Mul(right).Data[0]
+	return left.MulMat(mid).MulMat(right).Data[0]
 }

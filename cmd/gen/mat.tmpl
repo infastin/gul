@@ -1,0 +1,99 @@
+// {{.Comment}}
+package gm{{.BitSize}}
+
+import "fmt"
+
+{{range $m := enum 2 3 4 -}}
+{{range $n := enum 2 3 4 -}}
+{{$type := typename $m $n -}}
+
+type {{typename $m $n}} [{{mul $m $n}}]float{{$.BitSize}}
+
+func (m1 {{typename $m $n}}) Add(m2 {{typename $m $n}}) {{typename $m $n}} {
+	return {{typename $m $n}}{
+		{{range $i := iter 0 $m -}}
+		{{range $j := iter 0 $n}}m1[{{mul $i $n | add $j}}] + m2[{{mul $i $n | add $j}}], {{end}}
+		{{end -}}
+	}
+}
+
+func (m1 {{typename $m $n}}) Sub(m2 {{typename $m $n}}) {{typename $m $n}} {
+	return {{typename $m $n}}{
+		{{range $i := iter 0 $m -}}
+		{{range $j := iter 0 $n}}m1[{{mul $i $n | add $j}}] - m2[{{mul $i $n | add $j}}], {{end}}
+		{{end -}}
+	}
+}
+
+func (m {{typename $m $n}}) Mul(c float{{$.BitSize}}) {{typename $m $n}} {
+	return {{typename $m $n}}{
+		{{range $i := iter 0 $m -}}
+		{{range $j := iter 0 $n}}m[{{mul $i $n | add $j}}] * c, {{end}}
+		{{end -}}
+	}
+}
+
+{{range $l := enum 1 2 3 4 -}}
+
+func (m1 {{typename $m $n}}) Mul{{simple_typename $n $l}}(m2 {{typename $n $l}}) {{typename $m $l}} {
+	return {{typename $m $l}}{
+		{{range $i := iter 0 $m}}
+		{{- range $j := iter 0 $l -}}
+		{{range $k := iter 0 $n}}{{sep " + " $k}}m1[{{mul $i $n | add $k}}]*m2[{{mul $k $l | add $j}}]{{end}}{{", "}} 
+		{{- end}}
+		{{end -}}
+	}
+}
+
+{{end -}}
+
+
+{{if eq $n $m -}}
+
+func (m {{typename $m $n}}) Trace() float{{$.BitSize}} {
+	return {{range $i := iter 0 $m}}{{sep " + " $i}}m[{{mul $i $m | add $i}}]{{end}}
+}
+
+func (m {{typename $m $n}}) Det() float{{$.BitSize}} {
+	{{if eq $m 2 -}}
+	return m[0]*m[3] - m[1]*m[2]
+	{{else if eq $m 3 -}}
+	return m[0]*m[4]*m[8] - m[0]*m[5]*m[7] - m[1]*m[3]*m[8] + m[1]*m[5]*m[6] + m[2]*m[3]*m[7] - m[2]*m[4]*m[6]
+	{{else if eq $m 4 -}}
+	return m[0]*m[5]*m[10]*m[15] - m[0]*m[5]*m[11]*m[14] - m[0]*m[6]*m[9]*m[15] + m[0]*m[6]*m[11]*m[13] +
+		m[0]*m[7]*m[9]*m[14] - m[0]*m[7]*m[10]*m[13] - m[1]*m[4]*m[10]*m[15] + m[1]*m[4]*m[11]*m[14] +
+		m[1]*m[6]*m[8]*m[15] - m[1]*m[6]*m[11]*m[12] - m[1]*m[7]*m[8]*m[14] + m[1]*m[7]*m[10]*m[12] +
+		m[2]*m[4]*m[9]*m[15] - m[2]*m[4]*m[11]*m[13] - m[2]*m[5]*m[8]*m[15] + m[2]*m[5]*m[11]*m[12] +
+		m[2]*m[7]*m[8]*m[13] - m[2]*m[7]*m[9]*m[12] - m[3]*m[4]*m[9]*m[14] + m[3]*m[4]*m[10]*m[13] +
+		m[3]*m[5]*m[8]*m[14] - m[3]*m[5]*m[10]*m[12] - m[3]*m[6]*m[8]*m[13] + m[3]*m[6]*m[9]*m[12]
+	{{end -}}
+}
+
+{{end -}}
+
+func (m {{typename $m $n}}) At(i, j int) float{{$.BitSize}} {
+	if i >= {{$m}} || j >= {{$n}} {
+		err := fmt.Errorf(
+			"trying to get a value out of matrix bounds (got position (%d, %d) while matrix size is ({{$m}}x{{$n}}))",
+			 i, j,
+		)
+		panic(err)
+	}
+
+	return m[j+i*{{$n}}]
+}
+
+func (m {{typename $m $n}}) Set(i, j int, value float{{$.BitSize}}) {
+	if i >= {{$m}} || j >= {{$n}} {
+		err := fmt.Errorf(
+			"trying to set a value out of matrix bounds (got position (%d, %d) while matrix size is ({{$m}}x{{$n}}))",
+			i, j,
+		)
+		panic(err)
+	}
+
+	m[j+i*{{$n}}] = value
+}
+
+{{end -}}
+{{end -}}

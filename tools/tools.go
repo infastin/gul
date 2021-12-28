@@ -63,6 +63,7 @@ func SplitRange(start, end, step, n int, fn func(start, end int)) {
 
 var randomSrc = rand.Source(nil)
 
+// Random string generator from https://stackoverflow.com/a/31832326.
 func randString(n int) string {
 	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
 	const charsIdxBits = 6
